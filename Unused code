@@ -1,0 +1,93 @@
+
+void config(int nodeType, int * portType, int portNum) {
+	nodeType = nodeType;
+	for (int i = 0; i <= portNum, i ++) {
+		Port p = malloc(Port);
+		p.type = portType[i];
+		ports[portNum++] = p;
+	}
+}
+void init() { 
+	setPortStatus(RRPP_PORT_STATUS_BLOCK, 0);
+	setPortStatus(RRPP_PORT_STATUS_BLOCK, 1);
+	if(nodeType == RRPP_MAIN_NODE) {
+		createHelloPkg();
+		startHelloTimer();
+	}
+}
+
+void startHelloTime() {
+	struct itimerval t; 
+	t.it_interval.tv_usec = 0;
+	t.it_interval.tv_sec = 2;
+	t.it_value.tv_usec = 0;
+	t.it_value.tv_sec = 2;
+	setitimer(ITIMER_REAL, &t, NULL);
+	signal(SIGALRM, helloTimeOut);
+}
+
+void helloTimeOut() {
+	downAction();
+	downPort();
+}
+ 
+void recieveControlPkg(char* pkg) {
+	if(nodeType == RRPP_NODE_TYPE_TRANS){
+		sendPkg(pkg);
+		return;
+	}
+		
+	int type = getPkgType(pkg);
+	switch(type) {
+		case RRPP_PKG_TYPE_HELLO: 
+			helloAction();
+			break;
+		case RRPP_PKG_TYPE_DOWN:
+			downAction();
+			break;
+		case RRPP_PKG_TYPE_UP:
+			upAction();
+			break;
+		case RRPP_PKG_TYPE_EDGE_HELLO:
+		case RRPP_PKG_TYPE_EDGE_FAILED:
+		default:
+			
+	} }
+
+void portStatusChanged(int portId, int newStatus) {
+	if(newStatus == RRPP_PORT_STATUS_DOWN) 
+		createDownPkg();
+	else if (newStatus == RRPP_PORT_STATUS_UP && getPortStatus(portId) == RRPP_PORT_STATUS_DOWN)
+		createUpPkg();
+} 
+
+
+char* createHelloPkg() {
+	while(1) {
+		if(getPortStatus == true) {
+			setTimer(HELLO_PKG_INTERVAL, createHelloPkg());
+		}
+					
+	}
+	return sendRRPPPkg("hello", nodeId);
+}
+
+void helloAction() {
+	blockPort(2, ringId);
+	flush();
+	sendRRPPPkg(RRPP_PKG_TYPE_FLUSH, nodeId);
+}
+
+void upAction() {
+	getPort(2, ringId);
+	sendRrppPkg(RRPP_PKG_TYPE_UP, nodeId);
+}
+
+void downAction() {
+	if(getPortStatus(1) == PORT_STATUS_UP) {
+		blockPort(1, ringId);
+	}
+	sendRrppPkg(RRPP_PKG_TYPE_DOWN, nodeId);
+
+}
+
