@@ -14,6 +14,12 @@ typedef uint64_t u64;
 #define SW_MAX_ETH_LEN (1522)
 #define RPORT_TYPE_MASTER 1
 #define RPORT_TYPE_SLAVE 0
+
+#define RPS_BLOCK 001
+#define RPS_PREFORWARDING 002
+#define RPS_DOWN 003
+#define RPS_UP 004 
+
 struct sw_port 			// virt
 {
 	int id;
@@ -21,6 +27,18 @@ struct sw_port 			// virt
 	int ring_id; 
 	int status;
 	int the_other_port; // in the same ring
+};
+// describe dev info on certain rrpp ring 
+struct rrpp_ring
+{
+	u8 ring_id;
+	struct sw_port slave_port;
+	struct sw_port master_port;
+};
+struct rrpp_domain
+{
+	struct rrpp_ring* rings;
+	u8 domain_id;
 };
 struct sw_frame {
 	s32 length;

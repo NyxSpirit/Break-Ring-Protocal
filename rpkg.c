@@ -35,7 +35,6 @@ int forwardPkg(struct sw_dev* dev, const struct sw_frame* frame, int mask)
 	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (dev->rrpp_frame).frame_data;
 	
-	memcpy(data->src_mac_addr, pkg->src_mac_addr, MAC_ADDR_SIZE); 
 	memcpy(data->des_mac_addr, pkg->des_mac_addr, MAC_ADDR_SIZE);		
 	pkg->rrpp_type = data->rrpp_type;
 	return sw_send_frame_virt(dev, &(dev->rrpp_frame), mask);
@@ -46,7 +45,6 @@ int sendUpPkg(struct sw_dev* dev, const struct sw_frame* frame, int mask)
 	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (dev->rrpp_frame).frame_data;
 	
-	memcpy(data->src_mac_addr, pkg->src_mac_addr, MAC_ADDR_SIZE); 
 	memcpy(data->des_mac_addr, pkg->des_mac_addr, MAC_ADDR_SIZE);
 	pkg->rrpp_type = RPKG_LINK_UP;	
 	

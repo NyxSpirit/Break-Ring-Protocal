@@ -9,11 +9,6 @@
 #include "testenv.h"
 #include <string.h>
 
-#define RPS_BLOCK 001
-#define RPS_PREFORWARDING 002
-#define RPS_DOWN 003
-#define RPS_UP 004 
-
 int sw_rrpp_init(struct sw_dev* dev, int ntype, int nid, int portNum, struct sw_port* ports, struct sw_mac_addr localMac)
 {
 	dev->vlan_id = 1;
@@ -83,6 +78,8 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 				//updateExpireTimer(getRpkgHelloSeq(frame));
 				dev->hello_seq += 1;
 				sw_change_virt_port(dev, getSlavePortId(dev, ringId), RPS_BLOCK);	
+				sw_change_virt_port(dev, getMasterPortId(dev, ringId), RPS_UP);
+				sw_flush_fdb(dev);
 				sendCompleteFlushPkg(dev, frame, getMasterPortId(dev, ringId) );
 				sendCompleteFlushPkg(dev, frame, getSlavePortId(dev, ringId) );
 				//stopTimer(getHelloExpireTimer(helloSeq));
@@ -114,7 +111,9 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 				//recievedCommonFAction();
 				break;
 			case RPKG_COMPLETE_FLUSH_FDB:
-				sw_change_virt_port(dev, getPreforwardingPortId(dev, ringId), RPS_UP);
+				sw_change_virt_port(dev, getMasterPortId(dev, ringId), RPS_UP);
+				sw_change_virt_port(dev, getSlavePortId(dev, ringId), RPS_UP);
+				forwardPkg(dev, frame, getTheOtherPortId(dev, from_port));
 				sw_flush_fdb(dev);
 				//recievedCompleteFAction();
 				break;
@@ -209,12 +208,12 @@ void polling(struct sw_dev *dev)
 	while(1)
 	{
 		
-		//sendHelloPkg(dev, getMasterPortId(0));
+		sendHelloPkg(dev, getMasterPortId(dev, 0));
 		//start timer
 		
-		
-		pthread_create(&dev->hello_fail_id, NULL, (void*)helloTimeout, (void *)dev );
-		sleep(dev->hello_interval* 1000);
+		//printf("%d ", dev->hello_interval);
+		//pthread_create(&dev->hello_fail_id, NULL, (void*)helloTimeout, (void *)dev );
+		sleep(dev->hello_interval);
 
 	}
 	
@@ -222,7 +221,7 @@ void polling(struct sw_dev *dev)
 
 int startHello(struct sw_dev* dev) 
 {
-	printf("start Hello proc\n");
+	printf("dev %d start Hello proc\n", dev->node_id);
 	pthread_create(&dev->polling_id, NULL, (void *)polling, (void *)dev);
 
 	return 0; 
