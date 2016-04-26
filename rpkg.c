@@ -1,6 +1,7 @@
 #include "rpkg.h"
 #include <stdio.h>
 #include <string.h>
+#include "testenv.h"
 #define MAC_ADDR_SIZE 48
 
 void assignFrameField(struct sw_frame* frame, int start, int length, u8* val)
@@ -59,10 +60,10 @@ int sendHelloPkg(struct sw_dev* dev, int mask)
 	
 	setMacAddr(data->des_mac_addr, data->sys_mac_addr);
 	data->rrpp_type = RPKG_HELLO;
-	data->hello_seq = helloSeq;
+	data->hello_seq = dev->hello_seq;
 	return sw_send_frame_virt(dev, &(dev->rrpp_frame), mask);
 }
-int createHelloFrame(struct sw_frame* frame, int hello_seq)
+int createHelloFrame(struct sw_dev* dev, struct sw_frame* frame, int hello_seq)
 {
 	memcpy(frame, &(dev->rrpp_frame), sizeof(struct sw_frame));
 	
@@ -110,7 +111,7 @@ struct sw_frame* getFrameModule(struct sw_dev* dev)
 	return &(dev->rrpp_frame);
 }
 
-int initRrppFrame(struct sw_dev *dev);
+int initRrppFrame(struct sw_dev *dev)
 {
 	dev->rrpp_frame.length = 48 * 16;
 	struct rrpp_frame* data = (struct rrpp_frame*)dev->rrpp_frame.frame_data;
@@ -164,7 +165,8 @@ int getRpkgRingId(const struct sw_frame* frame)
 
 int getRpkgHelloSeq(const struct sw_frame* frame)
 {
-	return (struct rrpp_frame*) frame->frame_data->hello_seq;
+	struct rrpp_frame* pframe = (struct rrpp_frame*) frame->frame_data;
+	return pframe->hello_seq;
 }
 
 

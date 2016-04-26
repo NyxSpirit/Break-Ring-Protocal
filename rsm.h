@@ -4,15 +4,9 @@
 #include "rpkg.h"
 #include "common.h"
 
-// time unit: ms
-struct Port
-{
-	int isMaster; 
-	int ringId; 
-	int status;  
-}; 
+ 
 
-int sw_rrpp_init(struct sw_dev* dev, int ntype, int nid, int portNum, int *portType, struct sw_mac_addr localMac);
+int sw_rrpp_init(struct sw_dev* dev, int ntype, int nid, int portNum, struct sw_port* ports, struct sw_mac_addr localMac);
 int sw_rrpp_start(struct sw_dev* dev); 
 int sw_rrpp_stop(struct sw_dev* dev);
 int sw_rrpp_destroy(struct sw_dev* dev);

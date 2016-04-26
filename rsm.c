@@ -4,45 +4,41 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <signal.h>
 #include <pthread.h>
 #include "testenv.h"
 #include <string.h>
 
-#define RRPP_PORT_STATUS_BLOCK 001
-#define RRPP_PORT_STATUS_PREFORWARDING 002
-#define RRPP_PORT_STATUS_DOWN 003
-#define RRPP_PORT_STATUS_UP 004 
+#define RPS_BLOCK 001
+#define RPS_PREFORWARDING 002
+#define RPS_DOWN 003
+#define RPS_UP 004 
 
-struct Port* ports;
-
-int portNumber;
-
-int sw_rrpp_init(struct sw_dev* dev, int ntype, int nid, int portNum, int *portType, struct sw_mac_addr localMac)
+int sw_rrpp_init(struct sw_dev* dev, int ntype, int nid, int portNum, struct sw_port* ports, struct sw_mac_addr localMac)
 {
 	dev->vlan_id = 1;
-	dev->hello_interval= 2;
-	dev->hello_fail_time = 4;
+	dev->hello_interval= 1;
+	dev->hello_fail_time = 3;
 	dev->hello_seq = 0;
 	dev->node_id = nid;
 	dev->node_type = ntype;
-	portNumber = portNum;
 	dev->hello_expire_time = -1;
 	dev->hello_expire_seq= -1;
 	memcpy(&dev->local_mac_addr,&localMac, sizeof(struct sw_mac_addr));
 
-	int ringId = 0;
-	ports = (struct Port*) malloc(sizeof(struct Port) * portNum);
+	dev->port_number = portNum;
+	dev->ports = (struct sw_port*) malloc(sizeof(struct sw_port) * portNum);
 	int i = 0;
 	for(i = 0; i < portNum; i++)
 	{
-		ports[i].isMaster = portType[i];
-		ports[i].status = 0;
-		ports[i].ringId = ringId; 
-		disablePort(i);
+		struct sw_port* port = &dev->ports[i];
+		port->id = ports[i].id;
+		port->type = ports[i].type;
+		port->ring_id = ports[i].ring_id;
+		port->the_other_port = ports[i].the_other_port;
+		sw_change_virt_port(dev, port->id, RPS_BLOCK);	
 	}
-	initRrppFrame(struct sw_dev* dev);
+	initRrppFrame(dev);
 	//printFrame(getFrameModule());
 	return 0;
 } 
@@ -52,7 +48,7 @@ int sw_rrpp_start(struct sw_dev* dev)
 	printf("RRPP start up \n");
 	if(dev->node_type == RNODE_MAIN)
 	{
-		startHello(struct sw_dev* dev);
+		startHello(dev);
 	} else
 	{
 	// no operation 	
@@ -63,15 +59,16 @@ int sw_rrpp_start(struct sw_dev* dev)
 int sw_rrpp_stop(struct sw_dev* dev)
 {
 	printf("RRPP stop \n");
-	stopHello(struct sw_dev* dev);
+	stopHello(dev);
 	return 0;
 }
 int sw_rrpp_destroy(struct sw_dev* dev)
 {
 	printf("RRPP destroy \n");
-	free(ports);
+	free(dev->ports);
 	return 0;
 }
+
 
 int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int from_port)
 {
@@ -80,26 +77,28 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 	if(dev->node_type == RNODE_MAIN)	
 	{
 		switch (frametype) 
-		{
+		{			
 			case RPKG_HELLO:
 				//recievedHelloAction();
-				updateExpireTimer(getRpkgHelloSeq(frame));
-				blockPort(getSlavePortId(ringId));
-				sendCompleteFlushPkg(dev, frame, getMasterPortId(ringId) );
-				sendCompleteFlushPkg(dev, frame, getSlavePortId(ringId) );
+				//updateExpireTimer(getRpkgHelloSeq(frame));
+				dev->hello_seq += 1;
+				sw_change_virt_port(dev, getSlavePortId(dev, ringId), RPS_BLOCK);	
+				sendCompleteFlushPkg(dev, frame, getMasterPortId(dev, ringId) );
+				sendCompleteFlushPkg(dev, frame, getSlavePortId(dev, ringId) );
 				//stopTimer(getHelloExpireTimer(helloSeq));
 				break;
 			case RPKG_LINK_UP:
 				//recievedUpAction();
-				blockPort(getSlavePortId(ringId));
-				sendCommonFlushPkg(dev, frame, getMasterPortId(ringId) );
-				sendCommonFlushPkg(dev, frame, getSlavePortId(ringId) );
+				sw_change_virt_port(dev, getSlavePortId(dev, ringId), RPS_BLOCK);	
+				sendCommonFlushPkg(dev, frame, getMasterPortId(dev, ringId) );
+				sendCommonFlushPkg(dev, frame, getSlavePortId(dev, ringId) );
 				break;
 			case RPKG_LINK_DOWN:
 				//recievedDownAction();
-				enablePort(getSlavePortId(ringId));
+				sw_change_virt_port(dev, getSlavePortId(dev, ringId), RPS_UP);	
+				sendCommonFlushPkg(dev, frame, getMasterPortId(dev, ringId) );
 				sw_flush_fdb(dev);
-				sendCommonFlushPkg(dev, frame, getMasterPortId(ringId));
+				sendCommonFlushPkg(dev, frame, getSlavePortId(dev, ringId));
 				break;
 			default:
 				//forwardPkg(frame, from_port);
@@ -111,11 +110,11 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 		{
 			case RPKG_COMMON_FLUSH_FDB:
 				sw_flush_fdb(dev);
-				forwardPkg(dev, frame, getTheOtherPortId(from_port));
+				forwardPkg(dev, frame, getTheOtherPortId(dev, from_port));
 				//recievedCommonFAction();
 				break;
 			case RPKG_COMPLETE_FLUSH_FDB:
-				enablePort(getPreforwardingPortId(ringId));
+				sw_change_virt_port(dev, getPreforwardingPortId(dev, ringId), RPS_UP);
 				sw_flush_fdb(dev);
 				//recievedCompleteFAction();
 				break;
@@ -127,18 +126,46 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 
 	return 0;
 }
-int getTheOtherPortId(int port){ return 1 - port;}
-int getSlavePortId(int ringId){ return 1;}
-int getMasterPortId(int ringId){ return 0;}
-int getPreforwardingPortId(int ringId){ return 0;}
-int blockPort(int portId) { printf("disable Port id %d\n", portId); return 0;}
-int enablePort(int portId) { printf("enable Port id %d\n", portId); return 0;}
-int disablePort(int portId) { printf("disable Port id %d\n", portId); return 0;}
-int preforwardPort(int portId)
-{ 
-	printf("set port status preforwarding %d\n", portId); 
-	//startPreforwardingTimeOut();
-	return 0;
+
+int getTheOtherPortId(struct sw_dev* dev, int port)
+{
+	int i = 0;
+	for(; i < dev->port_number; i++)
+	{
+		if(dev->ports[i].id == port)
+			return dev->ports[i].the_other_port;
+	}
+       	return -1;
+}
+int getSlavePortId(struct sw_dev* dev, int ringId)
+{
+	int i = 0;
+	for(; i < dev->port_number; i++)
+	{
+		if(dev->ports[i].ring_id == ringId && dev->ports[i].type == RPORT_TYPE_SLAVE)
+			return i;
+	}
+	return -1;
+}
+int getMasterPortId(struct sw_dev* dev, int ringId)
+{
+	int i = 0;
+	for(; i < dev->port_number; i++)
+	{
+		if(dev->ports[i].ring_id == ringId && dev->ports[i].type == RPORT_TYPE_MASTER)
+			return i;
+	}
+	return -1;
+}
+int getPreforwardingPortId(struct sw_dev* dev, int ringId)
+{
+	int i = 0;
+	for(; i < dev->port_number; i++)
+	{
+		if(dev->ports[i].ring_id == ringId && dev->ports[i].status == RPS_PREFORWARDING)
+			return i;
+	}
+	return -1;
 }
 
 int sw_rrpp_link_change(struct sw_dev* dev, int port, int link_up)
@@ -147,17 +174,20 @@ int sw_rrpp_link_change(struct sw_dev* dev, int port, int link_up)
 		return 0;
 	if(link_up == 1)
 	{
-		sendUpPkg(dev, getFrameModule(), getTheOtherPortId(port));
-		preforwardPort(port);
+		sendUpPkg(dev, getFrameModule(dev), getTheOtherPortId(dev, port));
+		sw_change_virt_port(dev, port, RPS_PREFORWARDING);
+		// start preforwarding wait		
 	}else
 	{
-		blockPort(port);
-		sendDownPkg(dev, getFrameModule(), getTheOtherPortId(port));
+		sw_change_virt_port(dev, port, RPS_BLOCK);
+		sendDownPkg(dev, getFrameModule(dev), getTheOtherPortId(dev, port));
 	}
 	return 0;
 }
-void helloTimeout (int signum, siginfo_t *info, void* dev_para)
+
+void helloTimeout (struct sw_dev* dev)
 {
+	/*
 	struct sw_dev* dev = (struct sw_dev*) dev_para;	struct itimerval t; 
 	signal(SIGALRM, helloHandler);
 	t.it_interval.tv_usec = 0;
@@ -167,49 +197,33 @@ void helloTimeout (int signum, siginfo_t *info, void* dev_para)
 
 	helloExpireSeqNum ++;
 	helloExpireTime += helloInterval;
-			
-}
-void helloHandler (int a)
-{
-	dev-> helloSeq += 1;
-	sendHelloPkg(getMasterPortId(0));
+	*/	
+	//pthread_cond_timedwait(&(dev->hello_recieved), NULL, dev->hello_fail_time);
+		
+	//enablePort(getslavePortId(0));	
 
-	if(helloExpireTime < helloInterval)
-	{
-		//hello fail
-		struct itimerval t; 
-		signal(SIGALRM, helloTimeout);
-		t.it_interval.tv_usec = 0;
-		t.it_interval.tv_sec = helloExpireTime - helloInterval;
-		t.it_value.tv_usec = 0;
-		t.it_value.tv_sec = 0;
-		struct sigaction act;
-		act.sa_sigaction= helloTimeout;
-		act.sa_flags = SA_SIGINFO;
-				
-	}
-	//set new expire timer 
-	
-}
-void updateExpireTimer(int seqNo)
-{
-	if(seqNo >= helloExpireSeqNum)
-	{
-		helloExpireTime = helloExpireTime + (seqNo - helloExpireSeqNum + 1) * helloInterval; 
-		helloExpireSeqNum = seqNo + 1;
-	}	
 }
  
 void polling(struct sw_dev *dev)
 {
-	printf("start Hello proc\n");
+	while(1)
+	{
+		
+		//sendHelloPkg(dev, getMasterPortId(0));
+		//start timer
+		
+		
+		pthread_create(&dev->hello_fail_id, NULL, (void*)helloTimeout, (void *)dev );
+		sleep(dev->hello_interval* 1000);
+
+	}
 	
 }
 
 int startHello(struct sw_dev* dev) 
 {
-	
-	pthread_create( &dev->polling_id, NULL, (void *)polling, (void *)dev);
+	printf("start Hello proc\n");
+	pthread_create(&dev->polling_id, NULL, (void *)polling, (void *)dev);
 
 	return 0; 
 }
@@ -219,22 +233,3 @@ int stopHello(struct sw_dev* dev) {
 	//signal(SIGALRM, SIG_IGN);
 	return 0;
 }
-/*
- *sleep(10);
-	struct sigaction act;
-	act.sa_sigaction = helloHandler;
-	act.sa_flags = SA_SIGINFO;
-	struct itimerval t; 
-	sigaction(SIGALRM, &act, NULL);
-	t.it_interval.tv_usec = 0;
-	t.it_interval.tv_sec = helloInterval;
-	t.it_value.tv_usec = 0;
-	t.it_value.tv_sec = 0;
-	setitimer(0, &t, NULL); //
-	union sigval dev_para;
-	dev_para.sival_ptr = dev;
-	sigqueue(getpid(), SIGALRM, dev_para); //
-	signal(SIGALRM, startHelloExpireTimer(getFrameModule(), getMasterPortId()); //
-	
-
- * */

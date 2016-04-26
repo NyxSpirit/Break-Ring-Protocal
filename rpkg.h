@@ -68,6 +68,6 @@ int getRpkgType(const struct sw_frame* frame);
 int getRpkgHelloSeq(const struct sw_frame* frame);
 
 void printFrame(const struct sw_frame* frame);
-int createHelloFrame(struct sw_frame* frame, int hello_seq);
+int createHelloFrame(struct sw_dev* dev, struct sw_frame* frame, int hello_seq);
 
 #endif

@@ -12,6 +12,16 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 #define SW_MAX_ETH_LEN (1522)
+#define RPORT_TYPE_MASTER 1
+#define RPORT_TYPE_SLAVE 0
+struct sw_port 			// virt
+{
+	int id;
+	int type;           // 1: Master 0:slave
+	int ring_id; 
+	int status;
+	int the_other_port; // in the same ring
+};
 struct sw_frame {
 	s32 length;
 	u8 frame_data[SW_MAX_ETH_LEN] ;
@@ -23,6 +33,10 @@ struct sw_dev {
 	u8 vlan_id;
 	u8 node_id;
 	u8 node_type;
+	
+	u8 port_number;
+	struct sw_port* ports;
+
 	u8 hello_expire_time;
 	u8 hello_expire_seq;
 	u8 hello_seq;
@@ -33,7 +47,10 @@ struct sw_dev {
 	struct sw_mac_addr local_mac_addr;
 	
         struct sw_frame rrpp_frame;
-
+	
 	pthread_t polling_id;
+	pthread_t hello_fail_id;
+	pthread_key_t hello_wait_key;	
+	pthread_cond_t hello_recieved;
 };
 #endif

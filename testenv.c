@@ -1,6 +1,8 @@
 #include "testenv.h"
-#include <pThread.h>
+#include <pthread.h>
 #include <stdio.h>
+
+#define LOG_FILE "log"
 
 void printFrame(const struct sw_frame*  frame)
 {
@@ -25,12 +27,12 @@ int sw_send_frame_virt(struct sw_dev *dev, const struct sw_frame *frame, u32 mas
 }
 int sw_flush_fdb(struct sw_dev *dev)
 {
-	printf("flushing fdb now ");
+	printf("flushing fdb now\n ");
 	return 0;
 }
 
 int sw_change_virt_port(struct sw_dev *dev, int port, int link_up)
 {
-	printf("change port id %d to status %d", port, link_up);
+	printf("change sw id %d, port id %d to status %d\n", dev->node_id, port, link_up);
 	return 0;
 }
