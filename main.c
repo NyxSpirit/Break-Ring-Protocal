@@ -1,14 +1,6 @@
 #include <stdio.h>
 #include "rsm.h"
 
-
-void readControl()
-{
-	char control[10];
-	int id;
-	scanf("%s %d",control, &id);
-
-}
 void portInit(struct sw_port* port, int id, int type, int ringId, int theOtherPort)
 {
 	port->id = id;
@@ -20,31 +12,38 @@ void portInit(struct sw_port* port, int id, int type, int ringId, int theOtherPo
 int main(int argc, char* args[])
 {
 	//Configuration 
-	struct sw_port ports[10];
-	int portNum = 2;
 	int nodeType = 0;
 	int nodeId = 1;
-	struct sw_mac_addr localMac;
-	//sw_rrpp_init(nodeType, nodeId, portNum, portTypes, localMac);
-	
-	// create an 3-node ring topo;
+	int masterPort;
+	int slavePort;
 	
 	int i = 0;
+	int vlan = 0;
+	int domainNum = 1;
+	int ringNum = 1;
+
+	int domainId = 1;
+	int ringId = 1;
+		// create an 3-node ring topo;
 	int nodeNum = 3;
 	for(i = 0; i < nodeNum; i++)
 	{
-		portInit(&ports[0], 0, RPORT_TYPE_MASTER, 0, 1);
-		portInit(&ports[1], 1, RPORT_TYPE_SLAVE, 0, 0);
+		nodeId = i;
 		if(i == 0)
 			nodeType = RNODE_MAIN;
 		else
 			nodeType = RNODE_TRANSFER;
-		sw_rrpp_init(&gl_devs[i], nodeType, i, portNum, ports, localMac);
-		initLink(&gl_links[i], i, 0, (i+1)%3, 1);	
+		masterPort = 0;
+		slavePort = 1;
+
+		sw_rrpp_init_device(&gl_devs[i], domainNum);
+		sw_rrpp_init_domain(&gl_devs[i].domains[0], domainId, ringNum, vlan, nodeId);
+		sw_rrpp_init_ring(&gl_dev[i].domains[0].rings[0], ringId, ringLevel, nodeType, masterPort, slavePort);
+
+	        initLink(&gl_links[i], i, 0, (i+1)%3, 1);	
 	}
-	//sw_rrpp_init(&gl_devs[1], RNODE_TRANSFER, 0, portNum, portTypes, localMac);
 	
-	//start test 
+	//Start RRPP
 	
 	for(i = 0; i < DEV_NUMBER; i++)
 	{

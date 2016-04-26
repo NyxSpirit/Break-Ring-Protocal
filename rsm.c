@@ -9,32 +9,38 @@
 #include "testenv.h"
 #include <string.h>
 
-int sw_rrpp_init(struct sw_dev* dev, int ntype, int nid, int portNum, struct sw_port* ports, struct sw_mac_addr localMac)
+int sw_rrpp_init_device(struct sw_dev* dev, int domainNum)
 {
-	dev->vlan_id = 1;
-	dev->hello_interval= 1;
-	dev->hello_fail_time = 3;
-	dev->hello_seq = 0;
-	dev->node_id = nid;
-	dev->node_type = ntype;
-	dev->hello_expire_time = -1;
-	dev->hello_expire_seq= -1;
-	memcpy(&dev->local_mac_addr,&localMac, sizeof(struct sw_mac_addr));
+	dev->domain_num = domainNum;
+	dev->domains = (struct rrpp_domain*)malloc(sizeof(struct rrpp_domain) * domainNum);
+	return 0;
+}
+int sw_rrpp_init_domain(struct rrpp_domain* domain, int domainId, int ringNum, int vlan, int nodeId)
+{
+	domain->domain_id = domainId;
+	domain->ring_num = ringNum;
+	domain->rings = (struct rrpp_ring*)malloc(sizeof(struct rrpp_ring) * ringNum);
+	domain->node_id = nodeId;
+	domain->vlan = vlan;
+	return 0;
+}
+int sw_rrpp_init_ring(struct rrpp_ring* ring, int ringId,
+	       	int ringLevel, int nodeType,
+	       	int masterPort, int slavePort)
+{
+	ring->ring_id = ringId;
+	ring->ring_level = ringLevel;
+	ring->node_type = nodeType;
+	ring->master_port = masterPort;
+	ring->slave_port = slavePort;
 
-	dev->port_number = portNum;
-	dev->ports = (struct sw_port*) malloc(sizeof(struct sw_port) * portNum);
-	int i = 0;
-	for(i = 0; i < portNum; i++)
-	{
-		struct sw_port* port = &dev->ports[i];
-		port->id = ports[i].id;
-		port->type = ports[i].type;
-		port->ring_id = ports[i].ring_id;
-		port->the_other_port = ports[i].the_other_port;
-		sw_change_virt_port(dev, port->id, RPS_BLOCK);	
-	}
-	initRrppFrame(dev);
+	ring->hello_seq = 0;
+	ring->hello_interval = 1000;
+	ring->hello_fail_time = 3000;
+	
+	initRrppFrame(ring);
 	//printFrame(getFrameModule());
+	
 	return 0;
 } 
 

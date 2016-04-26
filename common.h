@@ -32,13 +32,33 @@ struct sw_port 			// virt
 struct rrpp_ring
 {
 	u8 ring_id;
+	u8 ring_level;
+	u8 node_type;
+	
 	struct sw_port slave_port;
 	struct sw_port master_port;
+
+	u8 hello_expire_time;
+	u8 hello_expire_seq;
+	u8 hello_seq;
+	
+	u8 hello_interval;
+	u8 hello_fail_time;
+	
+        struct sw_frame rrpp_frame;
+	
+	pthread_t polling_id;
+	pthread_t hello_fail_id;
+	pthread_key_t hello_wait_key;	
+	pthread_cond_t hello_recieved;
 };
 struct rrpp_domain
 {
-	struct rrpp_ring* rings;
 	u8 domain_id;
+	u8 vlan;
+	u8 node_id;
+	u8 ring_num;
+	struct rrpp_ring* rings;
 };
 struct sw_frame {
 	s32 length;
@@ -48,27 +68,11 @@ struct sw_mac_addr {
 	u8 val[6];
 };
 struct sw_dev {
-	u8 vlan_id;
-	u8 node_id;
-	u8 node_type;
-	
+	struct sw_mac_addr local_mac_addr;
+
 	u8 port_number;
 	struct sw_port* ports;
-
-	u8 hello_expire_time;
-	u8 hello_expire_seq;
-	u8 hello_seq;
-	
-	u8 hello_interval;
-	u8 hello_fail_time;
-	
-	struct sw_mac_addr local_mac_addr;
-	
-        struct sw_frame rrpp_frame;
-	
-	pthread_t polling_id;
-	pthread_t hello_fail_id;
-	pthread_key_t hello_wait_key;	
-	pthread_cond_t hello_recieved;
+	u8 domain_num;
+	struct rrpp_domain* rrpp_domains;
 };
 #endif
