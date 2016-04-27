@@ -15,11 +15,17 @@ typedef uint64_t u64;
 #define RPORT_TYPE_MASTER 1
 #define RPORT_TYPE_SLAVE 0
 
-#define RPS_BLOCK 001
-#define RPS_PREFORWARDING 002
-#define RPS_DOWN 003
-#define RPS_UP 004 
-
+#define RPORT_STATUS_BLOCK 001
+#define RPORT_STATUS_PREFORWARDING 002
+#define RPORT_STATUS_DOWN 003
+#define RPORT_STATUS_UP 004 
+struct sw_frame {
+	s32 length;
+	u8 frame_data[SW_MAX_ETH_LEN] ;
+};
+struct sw_mac_addr {
+	u8 val[6];
+};
 struct sw_port 			// virt
 {
 	int id;
@@ -31,19 +37,20 @@ struct sw_port 			// virt
 // describe dev info on certain rrpp ring 
 struct rrpp_ring
 {
+	struct rrpp_domain* pdomain;
 	u8 ring_id;
 	u8 ring_level;
 	u8 node_type;
 	
-	struct sw_port slave_port;
-	struct sw_port master_port;
+	u8 slave_port;
+	u8 master_port;
 
 	u8 hello_expire_time;
 	u8 hello_expire_seq;
 	u8 hello_seq;
 	
-	u8 hello_interval;
-	u8 hello_fail_time;
+	u16 hello_interval;
+	u16 hello_fail_time;
 	
         struct sw_frame rrpp_frame;
 	
@@ -54,19 +61,14 @@ struct rrpp_ring
 };
 struct rrpp_domain
 {
+	struct sw_dev* pdev;
 	u8 domain_id;
-	u8 vlan;
+	u8 vlan_id;
 	u8 node_id;
 	u8 ring_num;
 	struct rrpp_ring* rings;
 };
-struct sw_frame {
-	s32 length;
-	u8 frame_data[SW_MAX_ETH_LEN] ;
-};
-struct sw_mac_addr {
-	u8 val[6];
-};
+
 struct sw_dev {
 	struct sw_mac_addr local_mac_addr;
 

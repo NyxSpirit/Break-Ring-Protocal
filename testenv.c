@@ -29,9 +29,10 @@ int sw_send_frame_virt(struct sw_dev *dev, const struct sw_frame *frame, u32 mas
 	//	printFrame(frame);
 	int port = mask;
 	struct rrpp_link* link;
-	link = getLink(dev->node_id, port);
+	int nodeId = dev->rrpp_domains[0].node_id;
+	link = getLink(nodeId, port);
 	int* direction = (int*)malloc(sizeof(int));
-	if(link->node_id[0] == dev->node_id)
+	if(link->node_id[0] == nodeId)
 		*direction = 0;
 	else
 		*direction = 1;
@@ -47,16 +48,17 @@ int sw_flush_fdb(struct sw_dev *dev)
 
 int sw_change_virt_port(struct sw_dev *dev, int port, int link_up)
 {
-	printf("change sw id %d, port id %d to status ", dev->node_id, port);
+	int domainId = 0;
+	printf("change sw id %d, port id %d to status ", dev->rrpp_domains[domainId].node_id, port);
 	switch(link_up)
 	{
-		case RPS_UP:
+		case RPORT_STATUS_UP:
 			printf("UP \n");
 			break;
-		case RPS_BLOCK:
+		case RPORT_STATUS_BLOCK:
 			printf("BLOCK \n");
 			break;
-		case RPS_DOWN:
+		case RPORT_STATUS_DOWN:
 			printf("DOWN \n");
 			break;
 		default:
@@ -107,9 +109,10 @@ void* passLink(int *dir)
 struct sw_dev* getDev(int nodeId)
 {
 	int i = 0;
+	int domain = 0;
 	for(i = 0; i < DEV_NUMBER; i++)
 	{
-		if(gl_devs[i].node_id == nodeId)
+		if(gl_devs[i].rrpp_domains[0].node_id == nodeId)
 			return &gl_devs[i];
 	}
 	return NULL;

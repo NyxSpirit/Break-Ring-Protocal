@@ -24,6 +24,9 @@ int main(int argc, char* args[])
 
 	int domainId = 1;
 	int ringId = 1;
+	int ringLevel = 1;
+	int helloInterval = 1000;
+	int helloFailTime = 3000;
 		// create an 3-node ring topo;
 	int nodeNum = 3;
 	for(i = 0; i < nodeNum; i++)
@@ -37,8 +40,9 @@ int main(int argc, char* args[])
 		slavePort = 1;
 
 		sw_rrpp_init_device(&gl_devs[i], domainNum);
-		sw_rrpp_init_domain(&gl_devs[i].domains[0], domainId, ringNum, vlan, nodeId);
-		sw_rrpp_init_ring(&gl_dev[i].domains[0].rings[0], ringId, ringLevel, nodeType, masterPort, slavePort);
+		sw_rrpp_init_domain(&gl_devs[i].rrpp_domains[0], &gl_devs[i], domainId, ringNum, vlan, nodeId);
+		sw_rrpp_init_ring(&gl_devs[i].rrpp_domains[0].rings[0], &gl_devs[i].rrpp_domains[0], ringId, ringLevel, nodeType, masterPort, slavePort,helloInterval, helloFailTime);
+		sw_rrpp_init_frame(&gl_devs[i]);
 
 	        initLink(&gl_links[i], i, 0, (i+1)%3, 1);	
 	}

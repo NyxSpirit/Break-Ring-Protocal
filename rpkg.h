@@ -55,19 +55,20 @@ struct rrpp_frame
 	u8 reserved[36];
 };
 
-int initRrppFrame(struct sw_dev *dev);
-int forwardPkg(struct sw_dev *dev, const struct sw_frame* frame, int mask);
-int sendUpPkg(struct sw_dev *dev, const struct sw_frame* frame, int mask); 
-int sendHelloPkg(struct sw_dev *dev, int mask); 
-int sendDownPkg(struct sw_dev *dev, const struct sw_frame* frame, int mask); 
-int sendCommonFlushPkg(struct sw_dev *dev, const struct sw_frame* frame, int mask); 
-int sendCompleteFlushPkg(struct sw_dev *dev, const struct sw_frame* frame, int mask); 
-struct sw_frame* getFrameModule(struct sw_dev *dev);
+int initRrppFrame(struct rrpp_ring *ring);
+int forwardPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask);
+int sendUpPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
+int sendHelloPkg(struct rrpp_ring *ring, int mask); 
+int sendDownPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
+int sendCommonFlushPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
+int sendCompleteFlushPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
+struct sw_frame* getFrameModule(struct rrpp_ring *ring);
 int getRpkgRingId(const struct sw_frame* frame);
 int getRpkgType(const struct sw_frame* frame);
 int getRpkgHelloSeq(const struct sw_frame* frame);
+int getRpkgDomainId(const struct sw_frame* frame);
 
 void printFrame(const struct sw_frame* frame);
-int createHelloFrame(struct sw_dev* dev, struct sw_frame* frame, int hello_seq);
+int createHelloFrame(struct rrpp_ring *ring, struct sw_frame* frame, int hello_seq);
 
 #endif

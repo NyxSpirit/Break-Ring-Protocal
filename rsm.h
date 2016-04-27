@@ -7,10 +7,12 @@
  
 
 int sw_rrpp_init_device(struct sw_dev* dev, int domainNum);
-int sw_rrpp_init_domain(struct rrpp_domain* domain, int domainId, int ringNum, int vlan, int nodeId);
-int sw_rrpp_init_ring(struct rrpp_ring* ring, int ringId,
+int sw_rrpp_init_domain(struct rrpp_domain* domain, struct sw_dev* pdev, int domainId, int ringNum, int vlanId, int nodeId);
+int sw_rrpp_init_ring(struct rrpp_ring* ring, struct rrpp_domain* pdomain, int ringId,
 	       	int ringLevel, int nodeType,
-	       	int masterPort, int slavePort)
+	       	int masterPort, int slavePort, 
+		int helloInterval, int helloFailTime);
+int sw_rrpp_init_frame(struct sw_dev* dev);
 
 int sw_rrpp_start(struct sw_dev* dev); 
 int sw_rrpp_stop(struct sw_dev* dev);
