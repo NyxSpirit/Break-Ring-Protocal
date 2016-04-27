@@ -3,6 +3,7 @@
 #include <string.h>
 #include "rsm.h"
 #include <stdlib.h>
+#include "log.h"
 
 #define LOG_FILE "log"
 #define LINK_PASS_TIME 0 

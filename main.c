@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "rsm.h"
+#include "log.h"
 
 void portInit(struct sw_port* port, int id, int type, int ringId, int theOtherPort)
 {
@@ -46,9 +47,11 @@ int main(int argc, char* args[])
 
 	        initLink(&gl_links[i], i, 0, (i+1)%3, 1);	
 	}
+	//Configuration end
 	
-	//Start RRPP
+	//Start RRPP test
 	
+	initLogger(&logger);
 	for(i = 0; i < DEV_NUMBER; i++)
 	{
 		sw_rrpp_start(&gl_devs[i]);
@@ -59,7 +62,9 @@ int main(int argc, char* args[])
 	//sw_rrpp_link_change(&gl_devs[]);
 
 	getchar();
-	//end 
+	destroyLogger(&logger);
+	//RRPP test end 
+
 	for(i = 0; i < DEV_NUMBER; i++)
 	{
 		sw_rrpp_stop(&gl_devs[i]);
