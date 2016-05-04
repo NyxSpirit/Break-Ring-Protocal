@@ -32,7 +32,6 @@ struct sw_port 			// virt
 	int type;           // 1: Master 0:slave
 	int ring_id; 
 	int status;
-	int the_other_port; // in the same ring
 };
 // describe dev info on certain rrpp ring 
 struct rrpp_ring
@@ -56,8 +55,11 @@ struct rrpp_ring
 	
 	pthread_t polling_id;
 	pthread_t hello_fail_id;
-	pthread_key_t hello_wait_key;	
-	pthread_cond_t hello_recieved;
+	u8 arrived_hello_seq;
+	
+	pthread_t flush_wait_id;
+	u8 wait_port;
+	
 };
 struct rrpp_domain
 {

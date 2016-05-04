@@ -57,11 +57,11 @@ struct rrpp_frame
 
 int initRrppFrame(struct rrpp_ring *ring);
 int forwardPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask);
-int sendUpPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
 int sendHelloPkg(struct rrpp_ring *ring, int mask); 
-int sendDownPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
-int sendCommonFlushPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
-int sendCompleteFlushPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask); 
+int sendUpPkg(struct rrpp_ring *ring, int mask); 
+int sendDownPkg(struct rrpp_ring *ring, int mask); 
+int sendCommonFlushPkg(struct rrpp_ring *ring, int mask); 
+int sendCompleteFlushPkg(struct rrpp_ring *ring, int mask); 
 struct sw_frame* getFrameModule(struct rrpp_ring *ring);
 int getRpkgRingId(const struct sw_frame* frame);
 int getRpkgType(const struct sw_frame* frame);

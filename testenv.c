@@ -4,14 +4,14 @@
 #include "rsm.h"
 #include <stdlib.h>
 #include "log.h"
+#include "rpkg.h"
 
 #define LOG_FILE "log"
-#define LINK_PASS_TIME 0 
+#define LINK_PASS_TIME 1000 
 
 
 void printFrame(const struct sw_frame*  frame)
 {
-	printf("This frame is of length: %d\n", frame->length);
 	int i = 0;
 	for(; i < frame->length/8; i++) 
 	{
@@ -21,13 +21,13 @@ void printFrame(const struct sw_frame*  frame)
 		if(i % 6 == 5)
 			printf("\n");
 	}
-	printf("\nprinting over.\n");
 }
 
 int sw_send_frame_virt(struct sw_dev *dev, const struct sw_frame *frame, u32 mask)
 {
-	printf("sending frame from port mask: %d\n ", mask);
-	//	printFrame(frame);
+	char info[50];
+	sprintf(info, "sending frame type %d from port mask: %d ", getRpkgType(frame), mask);
+	logInfo(dev, info);
 	int port = mask;
 	struct rrpp_link* link;
 	int nodeId = dev->rrpp_domains[0].node_id;
@@ -43,27 +43,34 @@ int sw_send_frame_virt(struct sw_dev *dev, const struct sw_frame *frame, u32 mas
 }
 int sw_flush_fdb(struct sw_dev *dev)
 {
-	printf("flushing fdb now\n ");
+	logInfo(dev, "flushing fdb now ");
 	return 0;
 }
 
 int sw_change_virt_port(struct sw_dev *dev, int port, int link_up)
 {
 	int domainId = 0;
-	printf("change sw id %d, port id %d to status ", dev->rrpp_domains[domainId].node_id, port);
+	char info[80];
+	sprintf(info, "change dev id %d port id %d status from %d to %d", dev->rrpp_domains[domainId].node_id, port, dev->ports[port].status, link_up);
 	switch(link_up)
 	{
 		case RPORT_STATUS_UP:
-			printf("UP \n");
+			strcat(info, "UP" );
 			break;
 		case RPORT_STATUS_BLOCK:
-			printf("BLOCK \n");
+			strcat(info, "BLOCK");
 			break;
 		case RPORT_STATUS_DOWN:
-			printf("DOWN \n");
+			strcat(info,"DOWN");
 			break;
 		default:
-			printf("PRE / ERROR \n");
+			strcat(info, "PRE / ERROR");
+	}
+	if(dev->ports[port].status != link_up)
+	{
+		dev->ports[port].status = link_up;
+		logInfo(dev, info);
+
 	}
 	return 0;
 }
@@ -89,11 +96,11 @@ int initLink(struct rrpp_link* link, int n0, int p0, int n1, int p1)
 	link->status = RLINK_UP;
 	return 0;
 }
-void* passLink(int *dir)
+void passLink(int *dir)
 {
 	int direction = *dir;
 	free(dir);
-	sleep(LINK_PASS_TIME);
+	usleep(LINK_PASS_TIME);
 	struct rrpp_link* link = NULL;
 	int i = 0;
 	for(i = 0; i < LINK_NUMBER; i++)
@@ -101,11 +108,25 @@ void* passLink(int *dir)
 		if(gl_links[i].pass[direction] == pthread_self())
 			link = &gl_links[i];
 	}
+	if(link == NULL)
+	{
+		logError("link not found");
+		return ;
+
+	}
+	if(link->status == RLINK_DOWN)
+	{
+		logError("trying to pass throngh a link down");
+		return ;
+	}
 	struct sw_dev* dev;
 	dev = getDev(link->node_id[1-direction]);
+	char info[100];
+	sprintf(info, "sending a frame from node %d port %d to node %d port %d", link->node_id[direction], link->port_id[direction], link->node_id[1-direction], link->port_id[1-direction]);
+	logLink(link, info);
 	sw_rrpp_frame_handler(dev, &(link->frame[direction]), link->port_id[1-direction]);
 	
-	return 0;	
+	return ;	
 }
 struct sw_dev* getDev(int nodeId)
 {
@@ -117,4 +138,18 @@ struct sw_dev* getDev(int nodeId)
 			return &gl_devs[i];
 	}
 	return NULL;
+}
+void changeLinkStatus(struct rrpp_link* link, int status)
+{
+	link->status = status;
+	int i;
+	for(i = 0; i < 2; i++)
+	{
+		int port = link->port_id[i];
+		int node = link->node_id[i];
+		struct sw_dev* dev = getDev(node);
+
+		sw_rrpp_link_change(dev, port, status);
+	}
+
 }

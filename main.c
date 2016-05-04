@@ -1,12 +1,13 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "rsm.h"
 #include "log.h"
+#include "testenv.h"
 
 void portInit(struct sw_port* port, int id, int type, int ringId, int theOtherPort)
 {
 	port->id = id;
 	port->type = type;
-	port->the_other_port = theOtherPort;
 	port->ring_id = ringId;
 	
 }
@@ -30,6 +31,7 @@ int main(int argc, char* args[])
 	int helloFailTime = 3000;
 		// create an 3-node ring topo;
 	int nodeNum = 3;
+	int PORT_NUMBER = 2;
 	for(i = 0; i < nodeNum; i++)
 	{
 		nodeId = i;
@@ -40,6 +42,9 @@ int main(int argc, char* args[])
 		masterPort = 0;
 		slavePort = 1;
 
+		// init port
+		gl_devs[i].ports = (struct sw_port*) malloc(sizeof(struct sw_port) * PORT_NUMBER);
+		//
 		sw_rrpp_init_device(&gl_devs[i], domainNum);
 		sw_rrpp_init_domain(&gl_devs[i].rrpp_domains[0], &gl_devs[i], domainId, ringNum, vlan, nodeId);
 		sw_rrpp_init_ring(&gl_devs[i].rrpp_domains[0].rings[0], &gl_devs[i].rrpp_domains[0], ringId, ringLevel, nodeType, masterPort, slavePort,helloInterval, helloFailTime);
@@ -58,18 +63,18 @@ int main(int argc, char* args[])
 	}	
 
 	
+	printf("press any key to disable link between node 0 & 1\n");
 	getchar();
-	//sw_rrpp_link_change(&gl_devs[]);
-
+	changeLinkStatus(&gl_links[0], RLINK_DOWN);
 	getchar();
-	destroyLogger(&logger);
-	//RRPP test end 
 
 	for(i = 0; i < DEV_NUMBER; i++)
 	{
 		sw_rrpp_stop(&gl_devs[i]);
 		sw_rrpp_destroy(&gl_devs[i]);
 	}
+	destroyLogger(&logger);
+	//RRPP test end 
 	return 0;
 }
 

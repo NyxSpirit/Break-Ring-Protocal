@@ -7,8 +7,8 @@
 #define DEV_NUMBER  3
 #define LINK_NUMBER 3 
 
-#define RLINK_UP 0
-#define RLINK_DOWN 1
+#define RLINK_UP RPORT_STATUS_UP
+#define RLINK_DOWN RPORT_STATUS_DOWN
 
 struct rrpp_link 
 {
@@ -40,6 +40,7 @@ int linkStart(struct rrpp_link* link);
 
 int initLink(struct rrpp_link* link, int n0, int p0, int n1, int p1);
 
-void *passLink(int* dir);
+void passLink(int* dir);
 struct sw_dev* getDev(int nodeId);
+void changeLinkStatus(struct rrpp_link* link, int status);
 #endif

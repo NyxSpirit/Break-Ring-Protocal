@@ -31,23 +31,14 @@ void setMacAddr(u8* des, u8* src)
 
 int forwardPkg(struct rrpp_ring* ring, const struct sw_frame* frame, int mask)
 {
-	printf("forwarding Pkg\n");
 	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
-	pkg->rrpp_type = data->rrpp_type;
+	data->rrpp_type = pkg->rrpp_type;
+	data->hello_seq = pkg->hello_seq;
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
-int sendUpPkg(struct rrpp_ring* ring, const struct sw_frame* frame, int mask) 
-{
-	printf("sending up pkg\n");
-	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
-	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
-	
-	pkg->rrpp_type = RPKG_LINK_UP;	
-	
-	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
-}
+
 int sendHelloPkg(struct rrpp_ring* ring, int mask) 
 {
 	  
@@ -70,25 +61,30 @@ int createHelloFrame(struct rrpp_ring* ring, struct sw_frame* frame, int hello_s
 	data->hello_seq = hello_seq;
 	return 0;
 }
-int sendDownPkg(struct rrpp_ring* ring, const struct sw_frame* frame, int mask) 
+int sendUpPkg(struct rrpp_ring* ring,int mask) 
 {
-	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
+	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
+	
+	data->rrpp_type = RPKG_LINK_UP;
+	
+	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
+}
+int sendDownPkg(struct rrpp_ring* ring, int mask) 
+{
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
 	data->rrpp_type = RPKG_LINK_DOWN;
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
-int sendCommonFlushPkg(struct rrpp_ring* ring, const struct sw_frame* frame, int mask) 
+int sendCommonFlushPkg(struct rrpp_ring* ring, int mask) 
 {
-	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
 	data->rrpp_type = RPKG_COMMON_FLUSH_FDB;
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
-int sendCompleteFlushPkg(struct rrpp_ring* ring, const struct sw_frame* frame, int mask) 
+int sendCompleteFlushPkg(struct rrpp_ring* ring, int mask) 
 {
-	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
 	data->rrpp_type = RPKG_COMPLETE_FLUSH_FDB;
