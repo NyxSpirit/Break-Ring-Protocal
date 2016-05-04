@@ -3,6 +3,9 @@
 #include "rsm.h"
 #include "log.h"
 #include "testenv.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 void portInit(struct sw_port* port, int id, int type, int ringId, int theOtherPort)
 {
@@ -11,6 +14,7 @@ void portInit(struct sw_port* port, int id, int type, int ringId, int theOtherPo
 	port->ring_id = ringId;
 	
 }
+
 int main(int argc, char* args[])
 {
 	//Configuration 
@@ -26,7 +30,7 @@ int main(int argc, char* args[])
 
 	int domainId = 1;
 	int ringId = 1;
-	int ringLevel = 1;
+	int ringLevel = 0;
 	int helloInterval = 1000;
 	int helloFailTime = 3000;
 		// create an 3-node ring topo;
@@ -61,13 +65,18 @@ int main(int argc, char* args[])
 	{
 		sw_rrpp_start(&gl_devs[i]);
 	}	
-
+	char cmd[100] = "";
 	
-	printf("press any key to disable link between node 0 & 1\n");
+	//while(strcmp("quit", cmd) != 0 && strcmp("q", cmd) != 0)
+	printf("test started \n");
+	printf("press any key to disable link between node 1 & 2\n");
 	getchar();
-	changeLinkStatus(&gl_links[0], RLINK_DOWN);
+	changeLinkStatus(&gl_links[1], RLINK_DOWN);
+	printf("link status changed\n");
+	printf("press any key to enable link between node 1 & 2\n");
 	getchar();
-
+	changeLinkStatus(&gl_links[1], RLINK_UP);
+	getchar();
 	for(i = 0; i < DEV_NUMBER; i++)
 	{
 		sw_rrpp_stop(&gl_devs[i]);

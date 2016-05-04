@@ -34,10 +34,12 @@ void helloTimeout (struct rrpp_ring* ring)
 		//enablePort(getslavePortId(0));	
 	int helloSeq = ring->hello_seq;
 	sleep(ring->hello_fail_time/1000);
-	if(ring->arrived_hello_seq < helloSeq)
+	if(ring->arrived_hello_seq < helloSeq && ring->status == RRING_COMPLETE)
 	{
+		printf(" arrived seq %d helloseq %d hello interval %d\n", ring->arrived_hello_seq, helloSeq, ring->hello_interval);
 		sendCommonFlushPkg(ring, ring->slave_port );
-		sw_change_virt_port(ring->pdomain->pdev, ring->slave_port, RPORT_STATUS_BLOCK);	
+		sw_change_virt_port(ring->pdomain->pdev, ring->slave_port, RPORT_STATUS_UP);	
+		ring->status = RRING_FAIL;
 
 	}	
 
@@ -69,7 +71,7 @@ int sw_rrpp_init_ring(struct rrpp_ring* ring, struct rrpp_domain* pdomain, int r
 	ring->node_type = nodeType;
 	ring->master_port = masterPort;
 	ring->slave_port = slavePort;
-
+	ring->status = RRING_FAIL;
 
 	ring->pdomain->pdev->ports[masterPort].status  = RPORT_STATUS_BLOCK;
 	ring->pdomain->pdev->ports[masterPort].ring_id = ringId;
@@ -164,44 +166,64 @@ struct rrpp_ring* getRing(const struct rrpp_domain* domain, int ringId)
 
 int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int from_port)
 {
-	logInfo(dev, "recieve a frame");
 	int frametype = getRpkgType(frame);
        	int ringId = getRpkgRingId(frame);
 	int domainId = getRpkgDomainId(frame);
 	int seqNumber = getRpkgHelloSeq(frame);
 	struct rrpp_ring* ring = getRing(getDomain(dev, domainId), ringId);
+	char info[50];
+	sprintf(info, "recieve a frame type %d, seq %d", frametype, seqNumber);
+	logInfo(dev, info); 
 	if(ring->node_type == RNODE_MAIN)	
 	{
-		switch (frametype) 
-		{			
-			case RPKG_HELLO:
-				ring->arrived_hello_seq = seqNumber;
-				sendCompleteFlushPkg(ring, ring->master_port );
-				sendCompleteFlushPkg(ring, ring->slave_port );
-				sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_BLOCK);
-				sw_change_virt_port(dev, ring->master_port, RPORT_STATUS_UP);
-				sw_flush_fdb(dev);
-				break;
-			case RPKG_LINK_UP:
-				sendCommonFlushPkg(ring, ring->master_port );
-				sendCommonFlushPkg(ring, ring->slave_port );
-				sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_BLOCK);	
-				break;
-			case RPKG_LINK_DOWN:
-				sendCommonFlushPkg(ring, ring->master_port );
-				sendCommonFlushPkg(ring, ring->slave_port);
-				sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_UP);	
-				sw_flush_fdb(dev);
-				break;
-			default: 
+		if(ring->status == RRING_COMPLETE)
+		{
+			switch(frametype)
+			{
+				case RPKG_LINK_DOWN:
+					sendCommonFlushPkg(ring, ring->master_port );
+					sendCommonFlushPkg(ring, ring->slave_port);
+					sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_UP);	
+					sw_flush_fdb(dev);
+					ring->status = RRING_FAIL;
+					break;
+				case RPKG_HELLO:
+					ring->arrived_hello_seq = seqNumber;
+					break;
+				default:
+					;
+
+			}
+
+		} else if(ring->status == RRING_FAIL)
+		{
+			switch (frametype) 
+			{			
+				case RPKG_HELLO:
+					ring->arrived_hello_seq = seqNumber;
+					sendCompleteFlushPkg(ring, ring->master_port );
+					sendCompleteFlushPkg(ring, ring->slave_port );
+					sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_BLOCK);
+					sw_change_virt_port(dev, ring->master_port, RPORT_STATUS_UP);
+					sw_flush_fdb(dev);
+					ring->status = RRING_COMPLETE;
+					break;
+				case RPKG_LINK_UP:
+					sendCommonFlushPkg(ring, ring->master_port );
+					sendCommonFlushPkg(ring, ring->slave_port );
+					sw_flush_fdb(dev);
+					break;
+				default: 
 				;
-	       	} 
+	       	}
+		}		
+		 
 	} else if(ring->node_type == RNODE_TRANSFER)
 	{
 		switch (frametype)
 		{
 			case RPKG_COMMON_FLUSH_FDB:
-				forwardPkg(ring, frame, getTheOtherPortId(dev, from_port));
+				forwardPkg(ring, frame, getTheOtherPortId(ring, from_port));
 				sw_flush_fdb(dev);
 				break;
 			case RPKG_COMPLETE_FLUSH_FDB:

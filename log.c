@@ -16,11 +16,11 @@ int initLogger()
 		sprintf(no, "%d", gl_devs[i].rrpp_domains[0].node_id);
 		char logpath[100] = "./log/dev";
 
-		logger.logFiles[i] = open(strcat(logpath, no), O_WRONLY|O_CREAT|O_NONBLOCK,S_IRWXU|S_IRWXG|S_IRWXO);
+		logger.logFiles[i] = open(strcat(logpath, no), O_WRONLY|O_CREAT|O_NONBLOCK|O_TRUNC,S_IRWXU|S_IRWXG|S_IRWXO);
 		
 	}
-	logger.errorFile = open("./log/error", O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK, S_IRWXU|S_IRWXG|S_IRWXO);
-	logger.linkFile = open("./log/link", O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK, S_IRWXU|S_IRWXG|S_IRWXO);
+	logger.errorFile = open("./log/error", O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK|O_TRUNC, S_IRWXU|S_IRWXG|S_IRWXO);
+	logger.linkFile = open("./log/link", O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK|O_TRUNC, S_IRWXU|S_IRWXG|S_IRWXO);
 	return 0;
 
 }

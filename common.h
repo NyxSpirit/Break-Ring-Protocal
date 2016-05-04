@@ -19,6 +19,11 @@ typedef uint64_t u64;
 #define RPORT_STATUS_PREFORWARDING 002
 #define RPORT_STATUS_DOWN 003
 #define RPORT_STATUS_UP 004 
+
+#define RRING_COMPLETE 0
+#define RRING_FAIL 1
+#define RRING_INIT 2
+
 struct sw_frame {
 	s32 length;
 	u8 frame_data[SW_MAX_ETH_LEN] ;
@@ -40,12 +45,11 @@ struct rrpp_ring
 	u8 ring_id;
 	u8 ring_level;
 	u8 node_type;
+	u8 status;
 	
 	u8 slave_port;
 	u8 master_port;
 
-	u8 hello_expire_time;
-	u8 hello_expire_seq;
 	u8 hello_seq;
 	
 	u16 hello_interval;
