@@ -19,19 +19,7 @@ void flushTimeout (struct rrpp_ring* ring)
 }
 void helloTimeout (struct rrpp_ring* ring)
 {
-	/*
-	struct sw_dev* dev = (struct sw_dev*) dev_para;	struct itimerval t; 
-	signal(SIGALRM, helloHandler);
-	t.it_interval.tv_usec = 0;
-	t.it_interval.tv_sec = helloInterval - helloExpireTime;
-	t.it_value.tv_usec = 0;
-	t.it_value.tv_sec = 0;
-
-	helloExpireSeqNum ++;
-	helloExpireTime += helloInterval;
-	*/	
-	//pthread_cond_timedwait(&(dev->hello_recieved), NULL, dev->hello_fail_time);
-		//enablePort(getslavePortId(0));	
+		
 	int helloSeq = ring->hello_seq;
 	sleep(ring->hello_fail_time/1000);
 	if(ring->arrived_hello_seq < helloSeq && ring->status == RRING_COMPLETE)
@@ -163,20 +151,12 @@ struct rrpp_ring* getRing(const struct rrpp_domain* domain, int ringId)
 	}
 	return NULL;
 }
-
-int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int from_port)
+int mainNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
 {
 	int frametype = getRpkgType(frame);
-       	int ringId = getRpkgRingId(frame);
-	int domainId = getRpkgDomainId(frame);
 	int seqNumber = getRpkgHelloSeq(frame);
-	struct rrpp_ring* ring = getRing(getDomain(dev, domainId), ringId);
-	char info[50];
-	sprintf(info, "recieve a frame type %d, seq %d", frametype, seqNumber);
-	logInfo(dev, info); 
-	if(ring->node_type == RNODE_MAIN)	
-	{
-		if(ring->status == RRING_COMPLETE)
+	struct sw_dev* dev = ring->pdomain->pdev;
+	if(ring->status == RRING_COMPLETE)
 		{
 			switch(frametype)
 			{
@@ -214,13 +194,16 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 					sw_flush_fdb(dev);
 					break;
 				default: 
-				;
-	       	}
-		}		
-		 
-	} else if(ring->node_type == RNODE_TRANSFER)
-	{
-		switch (frametype)
+					;
+			}
+		}
+	return 0;
+}
+int transNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+{
+	int frametype = getRpkgType(frame);
+	struct sw_dev* dev = ring->pdomain->pdev;
+	switch (frametype)
 		{
 			case RPKG_COMMON_FLUSH_FDB:
 				forwardPkg(ring, frame, getTheOtherPortId(ring, from_port));
@@ -235,9 +218,53 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 			default:
 				forwardPkg(ring, frame, getTheOtherPortId(ring, from_port));
 		}
+	return 0;
+}
+int edgeNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+{
+	int frametype = getRpkgType(frame);
+	struct sw_dev* dev = ring->pdomain->pdev;
+
+	return 0;
+
+}
+int supNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+{
+	int frametype = getRpkgType(frame);
+	struct sw_dev* dev = ring->pdomain->pdev;
+
+	return 0;
+
+}
+int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int from_port)
+{
+       	int ringId = getRpkgRingId(frame);
+	int domainId = getRpkgDomainId(frame);
+	int frametype = getRpkgType(frame);
+	int seqNumber = getRpkgHelloSeq(frame);
+	struct rrpp_ring* ring = getRing(getDomain(dev, domainId), ringId);
+	char info[50];
+	sprintf(info, "recieve a frame type %d, seq %d", frametype, seqNumber);
+	logInfo(dev, info); 
+	switch(ring->node_type)
+	{
+		case RNODE_MAIN:
+			mainNodeSM(ring, frame, from_port);		
+			break;
+		case RNODE_TRANSFER:
+			transNodeSM(ring, frame, from_port);
+			break;
+		case RNODE_EDGE_MAIN:
+			edgeNodeSM(ring, frame, from_port);
+			break;
+		case RNODE_EDGE_SUPPORT:
+			supNodeSM(ring, frame, from_port);
+			break;
+		default:
+			logError("node_type error");
+			;
 
 	}
-
 	return 0;
 }
 
@@ -312,7 +339,8 @@ int startHello(struct rrpp_ring* ring)
 
 	return 0; 
 }
-int stopHello(struct rrpp_ring* ring) {
+int stopHello(struct rrpp_ring* ring)
+{
 	logInfo(ring->pdomain->pdev, "stop Hello proc");
 	pthread_cancel(ring->polling_id);
 	//signal(SIGALRM, SIG_IGN);
