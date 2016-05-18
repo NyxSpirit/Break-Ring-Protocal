@@ -4,7 +4,7 @@
 #include "testenv.h"
 
 enum rrpp_node_type {
-	RNODE_MAIN,
+	RNODE_MASTER,
 	RNODE_TRANSFER,
 	RNODE_EDGE_MAIN,
 	RNODE_EDGE_SUPPORT
@@ -49,24 +49,28 @@ struct rrpp_frame
 
 	u8 zeroes2;
 	u8 level;
-	u16 hello_seq;
+	u16 seq;
 	u16 zeroes3;
 
 	u8 reserved[36];
 };
 
 int initRrppFrame(struct rrpp_ring *ring);
-int forwardPkg(struct rrpp_ring *ring, const struct sw_frame* frame, int mask);
+
+int forwardPkg(struct rrpp_domain* domain, const struct sw_frame* frame, int mask);
+
 int sendHelloPkg(struct rrpp_ring *ring, int mask); 
 int sendUpPkg(struct rrpp_ring *ring, int mask); 
 int sendDownPkg(struct rrpp_ring *ring, int mask); 
 int sendCommonFlushPkg(struct rrpp_ring *ring, int mask); 
 int sendCompleteFlushPkg(struct rrpp_ring *ring, int mask); 
 struct sw_frame* getFrameModule(struct rrpp_ring *ring);
+
 int getRpkgRingId(const struct sw_frame* frame);
 int getRpkgType(const struct sw_frame* frame);
-int getRpkgHelloSeq(const struct sw_frame* frame);
+int getRpkgSeq(const struct sw_frame* frame);
 int getRpkgDomainId(const struct sw_frame* frame);
+int getRpkgRingLevel(const struct sw_frame* frame);
 
 void printFrame(const struct sw_frame* frame);
 int createHelloFrame(struct rrpp_ring *ring, struct sw_frame* frame, int hello_seq);

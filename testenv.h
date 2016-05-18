@@ -4,23 +4,23 @@
 #include <pthread.h>
 #include <sys/types.h>
 
-#define DEV_NUMBER  3
-#define LINK_NUMBER 3 
+#define DEV_NUMBER 8 
+#define LINK_NUMBER 10 
 
-#define RLINK_UP RPORT_STATUS_UP
-#define RLINK_DOWN RPORT_STATUS_DOWN
+#define RLINK_UP PORT_UP
+#define RLINK_DOWN PORT_DOWN
 
 struct rrpp_link 
 {
 	int status;
-	int port_id[2];
-	int node_id[2];
+	struct sw_port* port[2];
 	pthread_t pass[2];  //Full duplex   two Dirction pipe
 					//  node0 -> node1 
 					//  node1 -> node0
 	struct sw_frame frame[2];   // frame in two pipes
 
 };
+
 struct sw_dev gl_devs[DEV_NUMBER];
 struct rrpp_link gl_links[LINK_NUMBER];
 
@@ -32,15 +32,13 @@ void printFrame(const struct sw_frame*  frame);
 
 int sw_change_virt_port(struct sw_dev *dev, int port, int link_up);
 
-
-
-struct rrpp_link* getLink(int nodeId, int portId);
+//struct rrpp_link* getLink(int nodeId, int portId);
 
 int linkStart(struct rrpp_link* link);
 
-int initLink(struct rrpp_link* link, int n0, int p0, int n1, int p1);
+int initLink(struct rrpp_link* link, struct sw_port* p0, struct sw_port* p1);
 
 void passLink(int* dir);
-struct sw_dev* getDev(int nodeId);
+//struct sw_dev* getDev(int nodeId);
 void changeLinkStatus(struct rrpp_link* link, int status);
 #endif

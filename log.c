@@ -17,6 +17,7 @@ int initLogger()
 		char logpath[100] = "./log/dev";
 
 		logger.logFiles[i] = open(strcat(logpath, no), O_WRONLY|O_CREAT|O_NONBLOCK|O_TRUNC,S_IRWXU|S_IRWXG|S_IRWXO);
+		printf("%d %s", i, logpath);
 		
 	}
 	logger.errorFile = open("./log/error", O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK|O_TRUNC, S_IRWXU|S_IRWXG|S_IRWXO);
@@ -65,7 +66,7 @@ int logLink(struct rrpp_link* link, char* info)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	char buf[150];
-	sprintf(buf, "[link %d - %d][%d:%d:%d][%d]:%s\n", link->node_id[0], link->node_id[1], tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec, (int)tv.tv_usec, info);
+	sprintf(buf, "[link %d - %d][%d:%d:%d][%d]:%s\n", link->port[0]->pport->pring->pdomain->node_id, link->port[1]->pport->pring->pdomain->node_id, tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec, (int)tv.tv_usec, info);
 	write(logger.linkFile, buf, strlen(buf));
 	return 0;	
 }

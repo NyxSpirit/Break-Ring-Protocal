@@ -1,7 +1,7 @@
-#include "rpkg.h"
 #include <stdio.h>
 #include <string.h>
 #include "testenv.h"
+#include "rpkg.h"
 #define MAC_ADDR_SIZE 48
 
 void assignFrameField(struct sw_frame* frame, int start, int length, u8* val)
@@ -29,65 +29,75 @@ void setMacAddr(u8* des, u8* src)
 	} 
 }
 
-int forwardPkg(struct rrpp_ring* ring, const struct sw_frame* frame, int mask)
+int forwardPkg(struct rrpp_domain* domain, const struct sw_frame* frame, int mask)
 {
-	struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
-	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
+	//struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
+	//struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
-	data->rrpp_type = pkg->rrpp_type;
-	data->hello_seq = pkg->hello_seq;
-	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
+	//data->rrpp_type = pkg->rrpp_type;
+	//data->seq = pkg->seq[RPKG_HELLO];
+	return sw_send_frame_virt(domain->pdev, frame, mask);
 }
 
 int sendHelloPkg(struct rrpp_ring* ring, int mask) 
 {
-	  
 	//struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
-	
-	setMacAddr(data->des_mac_addr, data->sys_mac_addr);
+	//setMacAddr(data->des_mac_addr, data->sys_mac_addr);
+	ring->seq[RPKG_HELLO]++;  
 	data->rrpp_type = RPKG_HELLO;
-	data->hello_seq = ring->hello_seq;
+	data->seq = ring->seq[RPKG_HELLO];
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
-int createHelloFrame(struct rrpp_ring* ring, struct sw_frame* frame, int hello_seq)
+
+int createHelloFrame(struct rrpp_ring* ring, struct sw_frame* frame, int seq)
 {
 	memcpy(frame, &(ring->rrpp_frame), sizeof(struct sw_frame));
 	
 	struct rrpp_frame* data = (struct rrpp_frame*) frame->frame_data;
 	
-	setMacAddr(data->des_mac_addr, data->sys_mac_addr);
+	//setMacAddr(data->des_mac_addr, data->sys_mac_addr);
 	data->rrpp_type = RPKG_HELLO;
-	data->hello_seq = hello_seq;
+	data->seq = seq;
 	return 0;
 }
 int sendUpPkg(struct rrpp_ring* ring,int mask) 
 {
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
-	
-	data->rrpp_type = RPKG_LINK_UP;
-	
+	int type = RPKG_LINK_UP;
+
+	ring->seq[type] ++;
+	data->rrpp_type = type;
+	data->seq = ring->seq[type];
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
 int sendDownPkg(struct rrpp_ring* ring, int mask) 
 {
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
-	
-	data->rrpp_type = RPKG_LINK_DOWN;
+	int type = RPKG_LINK_DOWN;
+	ring->seq[type] ++;
+	data->rrpp_type = type;
+	data->seq = ring->seq[type];
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
 int sendCommonFlushPkg(struct rrpp_ring* ring, int mask) 
 {
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
-	data->rrpp_type = RPKG_COMMON_FLUSH_FDB;
+	int type = RPKG_COMMON_FLUSH_FDB;
+	ring->seq[type] ++;
+	data->rrpp_type = type;
+	data->seq = ring->seq[type];
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
 int sendCompleteFlushPkg(struct rrpp_ring* ring, int mask) 
 {
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
 	
-	data->rrpp_type = RPKG_COMPLETE_FLUSH_FDB;
+	int type = RPKG_COMPLETE_FLUSH_FDB;
+	ring->seq[type] ++;
+	data->rrpp_type = type;
+	data->seq = ring->seq[type];
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
 
@@ -125,7 +135,7 @@ int initRrppFrame(struct rrpp_ring* ring)
 	data->fail_timer = ring->hello_fail_time;
 	data->zeroes2 = 0;
 	data->level = ring->ring_level;		   // to be set
-	data->hello_seq = 0;		   // to be set
+	data->seq =  0;		   // to be set
 	data->zeroes3 = 0;
         int i = 0;
 	for(; i < 36; i++)
@@ -147,10 +157,15 @@ int getRpkgRingId(const struct sw_frame* frame)
 	return pframe->ring_id;
 }
 
-int getRpkgHelloSeq(const struct sw_frame* frame)
+int getRpkgSeq(const struct sw_frame* frame)
 {
 	struct rrpp_frame* pframe = (struct rrpp_frame*) frame->frame_data;
-	return pframe->hello_seq;
+	return pframe->seq;
+}
+
+int getRpkgRingLevel(const struct sw_frame* frame)
+{
+	return ((struct rrpp_frame*) frame->frame_data) -> level;
 }
 
 int getRpkgDomainId(const struct sw_frame* frame)

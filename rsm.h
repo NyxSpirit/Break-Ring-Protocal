@@ -4,7 +4,18 @@
 #include "rpkg.h"
 #include "common.h"
 
- 
+enum rrpp_port_status {
+	RPORT_STATUS_DOWN,
+	RPORT_STATUS_UP,
+	RPORT_STATUS_PREFORWARDING,
+	RPORT_STATUS_BLOCK
+};
+
+enum rrpp_ring_status {
+	RRING_COMPLETE,
+	RRING_FAIL,
+	RRING_INIT
+};
 
 int sw_rrpp_init_device(struct sw_dev* dev, int domainNum);
 int sw_rrpp_init_domain(struct rrpp_domain* domain, struct sw_dev* pdev, int domainId, int ringNum, int vlanId, int nodeId);

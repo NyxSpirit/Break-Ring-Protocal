@@ -1,4 +1,3 @@
-#include "rsm.h"
 #include <sys/time.h> 
 #include <sys/types.h>
 #include <unistd.h>
@@ -7,28 +6,89 @@
 #include <signal.h>
 #include <pthread.h>
 #include "testenv.h"
+#include "rsm.h"
 #include <string.h>
 #include "log.h"
+
+static int getMaskAddPort(int mask, int portId)
+{
+	if(portId >= 0)
+		return mask + (1 << portId);
+	else 
+		return mask;
+}
+static int getMaskDelPort(int mask, int portId)
+{
+	if(portId >= 0 && (mask & (1 << portId)))
+		return mask - (1 << portId);
+	else
+		return mask;
+}
+static int getMaskOfRing(const struct rrpp_ring* ring)
+{
+	int mask = 0;
+	mask += (ring->slave_port.virt_port == NULL) ? 0: 1<<(ring->slave_port.virt_port->id) ;
+	mask += (ring->master_port.virt_port == NULL) ? 0: 1<<(ring->master_port.virt_port->id) ;
+	return mask;
+}
+static int getMaskLELevel(const struct rrpp_domain* domain, int level)
+{
+	int mask = 0;
+	int i = 0;
+	for(i = 0; i < domain->ring_num; i++)
+	{
+		struct rrpp_ring* ring = &domain->rings[i];
+		if(ring->ring_level <= level)
+		{
+	mask += (ring->slave_port.virt_port != NULL) ? 1<<(ring->slave_port.virt_port->id) : 0;
+	mask += (ring->master_port.virt_port != NULL) ? 1<<(ring->master_port.virt_port->id) : 0;
+		}
+	}
+	return mask;
+
+}
+static int rrpp_init_port(struct rrpp_port* port, struct rrpp_ring* pring, struct sw_port* vport, int type)
+{
+	vport->pport = port;
+	vport->status = PORT_DOWN;
+	port->virt_port = vport;
+	port->type = type;
+	port->pring = pring;
+	port->status  = RPORT_STATUS_BLOCK;
+	return 0;
+}
+
+static int changeRrppPort(struct rrpp_port* port, int status)
+{
+	if(port->virt_port == NULL)
+		return 1;
+	port->status = status;
+	if(status == RPORT_STATUS_UP)
+		status = PORT_UP;
+	else
+		status = PORT_DOWN;
+	sw_change_virt_port(port->pring->pdomain->pdev, port->virt_port->id, status);
+	return 0;
+}
 void flushTimeout (struct rrpp_ring* ring)
 {
         sleep(ring->hello_fail_time/1000);
 	struct sw_dev* dev = ring->pdomain->pdev; 
-	int port = ring->wait_port;
-	if (dev->ports[port].status == RPORT_STATUS_PREFORWARDING)	
-		sw_change_virt_port(dev, port, RPORT_STATUS_UP);
+	struct rrpp_port* port = dev->ports[ring->wait_port].pport;
+	if (port->status == RPORT_STATUS_PREFORWARDING)	
+		changeRrppPort(port, RPORT_STATUS_UP);
 }
 void helloTimeout (struct rrpp_ring* ring)
 {
 		
-	int helloSeq = ring->hello_seq;
+	int helloSeq = ring->seq[RPKG_HELLO];
 	sleep(ring->hello_fail_time/1000);
-	if(ring->arrived_hello_seq < helloSeq && ring->status == RRING_COMPLETE)
+	if(getHistorySeq(ring->pdomain, RPKG_HELLO, ring->ring_id) < helloSeq && ring->status == RRING_COMPLETE)
 	{
-		printf(" arrived seq %d helloseq %d hello interval %d\n", ring->arrived_hello_seq, helloSeq, ring->hello_interval);
-		sendCommonFlushPkg(ring, ring->slave_port );
-		sw_change_virt_port(ring->pdomain->pdev, ring->slave_port, RPORT_STATUS_UP);	
+		//printf(" arrived seq %d helloseq %d hello interval %d\n", ring->arrived_hello_seq, helloSeq, ring->hello_interval);
+		sendCommonFlushPkg(ring, getMaskAddPort(0, ring->slave_port.virt_port->id));
+		changeRrppPort(&ring->slave_port, RPORT_STATUS_UP);	
 		ring->status = RRING_FAIL;
-
 	}	
 
 }
@@ -46,6 +106,7 @@ int sw_rrpp_init_domain(struct rrpp_domain* domain, struct sw_dev* dev, int doma
 	domain->rings = (struct rrpp_ring*)malloc(sizeof(struct rrpp_ring) * ringNum);
 	domain->node_id = nodeId;
 	domain->vlan_id = vlan_id;
+	memset(domain->history_seqs, 0, sizeof(domain->history_seqs));
 	return 0;
 }
 int sw_rrpp_init_ring(struct rrpp_ring* ring, struct rrpp_domain* pdomain, int ringId,
@@ -53,26 +114,33 @@ int sw_rrpp_init_ring(struct rrpp_ring* ring, struct rrpp_domain* pdomain, int r
 	       	int masterPort, int slavePort, 
 		int helloInterval, int helloFailTime)
 {
+	struct sw_port* port;
 	ring->pdomain = pdomain;
 	ring->ring_id = ringId;
 	ring->ring_level = ringLevel;
 	ring->node_type = nodeType;
-	ring->master_port = masterPort;
-	ring->slave_port = slavePort;
 	ring->status = RRING_FAIL;
 
-	ring->pdomain->pdev->ports[masterPort].status  = RPORT_STATUS_BLOCK;
-	ring->pdomain->pdev->ports[masterPort].ring_id = ringId;
-	ring->pdomain->pdev->ports[slavePort].ring_id = ringId;
-	ring->pdomain->pdev->ports[slavePort].status = RPORT_STATUS_BLOCK;
-	
-	ring->hello_seq = 0;
-	ring->arrived_hello_seq = 0;
+	if(masterPort != -1)
+	{
+	port = &ring->pdomain->pdev->ports[masterPort];
+	rrpp_init_port(&ring->master_port, ring, port, RPORT_TYPE_MASTER);
+	}else 
+		ring->master_port.virt_port = NULL;
+;
+	if(slavePort != -1)
+	{
+	port = &ring->pdomain->pdev->ports[slavePort];
+	rrpp_init_port(&ring->slave_port, ring, port, RPORT_TYPE_SLAVE);	
+	} else
+		ring->slave_port.virt_port = NULL;
+	memset(ring->seq, 0, sizeof(ring->seq));
 	ring->hello_interval = helloInterval; 
 	ring->hello_fail_time = helloFailTime;
 	
 	return 0;
 } 
+
 
 int sw_rrpp_init_frame(struct sw_dev* dev)
 {
@@ -86,38 +154,62 @@ int sw_rrpp_init_frame(struct sw_dev* dev)
 	}
 	return 0;
 }
-int sw_rrpp_start(struct sw_dev* dev)
+
+
+int rrpp_start_domain(struct rrpp_domain* domain)
 {
-	logInfo(dev, "Rrpp start");
 	int i = 0;
 	struct rrpp_ring* ring;
-	for(i = 0; i < dev->rrpp_domains[0].ring_num; i++)
+	for(i = 0; i < domain->ring_num; i++)
 	{
-		ring = &(dev->rrpp_domains[0].rings[i]);
-		if(ring->node_type == RNODE_MAIN)
+		ring = &(domain->rings[i]);
+		if(ring->node_type == RNODE_MASTER)
 		{
 			startHello(ring);
 		}
 	}
-	
-	return 0;	 
+	return 0;
 }
 
-int sw_rrpp_stop(struct sw_dev* dev)
+int rrpp_stop_domain(struct rrpp_domain* domain)
 {
-	logInfo(dev, "Rrpp stop");
 	int i = 0;
 	struct rrpp_ring* ring;
-	for(i = 0; i < dev->rrpp_domains[0].ring_num; i++)
+	for(i = 0; i < domain->ring_num; i++)
 	{
-		ring = &(dev->rrpp_domains[0].rings[i]);
-		if(ring->node_type == RNODE_MAIN)
+		ring = &(domain->rings[i]);
+		if(ring->node_type == RNODE_MASTER)
 		{
 			stopHello(ring);
 		}
 	}
 	return 0;
+	
 }
+
+int sw_rrpp_start(struct sw_dev* dev)
+{
+	logInfo(dev, "Rrpp start all domain");
+	int i = 0;
+	for(i = 0; i < dev->domain_num; i++)
+	{
+		struct rrpp_domain* domain = &dev->rrpp_domains[i];
+		rrpp_start_domain(domain);
+	}
+	return 0;	 
+}
+int sw_rrpp_stop(struct sw_dev* dev)
+{
+	logInfo(dev, "Rrpp stop all domains");
+	int i = 0;
+	for(i = 0; i < dev->domain_num; i++)
+	{
+		struct rrpp_domain* domain = &dev->rrpp_domains[i];
+		rrpp_stop_domain(domain);
+	}
+	return 0;
+}
+
 int sw_rrpp_destroy(struct sw_dev* dev)
 {
 	int i, j;
@@ -131,7 +223,7 @@ int sw_rrpp_destroy(struct sw_dev* dev)
 	return 0;
 }
 
-struct rrpp_domain* getDomain(const struct sw_dev* dev, int domainId)
+static struct rrpp_domain* getDomain(const struct sw_dev* dev, int domainId)
 {
 	int i = 0;
 	for(i = 0; i < dev->domain_num;i ++)
@@ -141,7 +233,7 @@ struct rrpp_domain* getDomain(const struct sw_dev* dev, int domainId)
 	}
 	return NULL;
 }
-struct rrpp_ring* getRing(const struct rrpp_domain* domain, int ringId)
+static struct rrpp_ring* getRing(const struct rrpp_domain* domain, int ringId)
 {
 	int i = 0;
 	for(i = 0; i < domain->ring_num; i++)
@@ -151,150 +243,143 @@ struct rrpp_ring* getRing(const struct rrpp_domain* domain, int ringId)
 	}
 	return NULL;
 }
-int mainNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+int getHistorySeq(const struct rrpp_domain* domain, int frameType, int ringId)
 {
-	int frametype = getRpkgType(frame);
-	int seqNumber = getRpkgHelloSeq(frame);
+	return domain->history_seqs[ringId * RRPP_FRAME_TYPE_NUMBER + frameType];
+}
+int setHistorySeq(struct rrpp_domain* domain, int frameType, int ringId, int seq)
+{
+	domain->history_seqs[ringId * RRPP_FRAME_TYPE_NUMBER + frameType] = seq;
+	return 0;
+}
+
+
+static int helloHandler(struct rrpp_domain* domain, const struct sw_frame* frame, int from_port)
+{
+	int ringId = getRpkgRingId(frame);
+	struct rrpp_ring* ring = getRing(domain, ringId);
+	if(ring != NULL && ring->node_type == RNODE_MASTER) // when corresponding ring master catch hello
+	{
+		struct sw_dev* dev = ring->pdomain->pdev;
+		sendCompleteFlushPkg(ring, getMaskOfRing(ring));
+		changeRrppPort(&ring->slave_port, RPORT_STATUS_BLOCK);
+		changeRrppPort(&ring->master_port, RPORT_STATUS_UP);
+		sw_flush_fdb(dev);
+		ring->status = RRING_COMPLETE;
+		
+	} else 				    // lower level node transfer hello  
+	{
+		int level = getRpkgRingLevel(frame);
+		forwardPkg(domain, frame, getMaskDelPort(getMaskLELevel(domain, level), from_port));
+	}
+	return 0;
+}	
+static int linkDownHandler(struct rrpp_domain* domain, const struct sw_frame* frame, int from_port)
+{
+	int ringId = getRpkgRingId(frame);
+	struct rrpp_ring* ring = getRing(domain, ringId);
 	struct sw_dev* dev = ring->pdomain->pdev;
-	if(ring->status == RRING_COMPLETE)
-		{
-			switch(frametype)
-			{
-				case RPKG_LINK_DOWN:
-					sendCommonFlushPkg(ring, ring->master_port );
-					sendCommonFlushPkg(ring, ring->slave_port);
-					sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_UP);	
+	if(ring != NULL && ring -> node_type == RNODE_MASTER && ring -> status == RRING_COMPLETE)
+	{
+					sendCommonFlushPkg(ring, getMaskOfRing(ring));
+					changeRrppPort(&ring->slave_port, RPORT_STATUS_UP);	
 					sw_flush_fdb(dev);
 					ring->status = RRING_FAIL;
-					break;
-				case RPKG_HELLO:
-					ring->arrived_hello_seq = seqNumber;
-					break;
-				default:
-					;
-
-			}
-
-		} else if(ring->status == RRING_FAIL)
-		{
-			switch (frametype) 
-			{			
-				case RPKG_HELLO:
-					ring->arrived_hello_seq = seqNumber;
-					sendCompleteFlushPkg(ring, ring->master_port );
-					sendCompleteFlushPkg(ring, ring->slave_port );
-					sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_BLOCK);
-					sw_change_virt_port(dev, ring->master_port, RPORT_STATUS_UP);
-					sw_flush_fdb(dev);
-					ring->status = RRING_COMPLETE;
-					break;
-				case RPKG_LINK_UP:
-					sendCommonFlushPkg(ring, ring->master_port );
-					sendCommonFlushPkg(ring, ring->slave_port );
-					sw_flush_fdb(dev);
-					break;
-				default: 
-					;
-			}
-		}
+	} else if (ring != NULL) {
+		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
+	}
 	return 0;
 }
-int transNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+static int linkUpHandler(struct rrpp_domain* domain, const struct sw_frame* frame, int from_port)
 {
-	int frametype = getRpkgType(frame);
-	struct sw_dev* dev = ring->pdomain->pdev;
-	switch (frametype)
-		{
-			case RPKG_COMMON_FLUSH_FDB:
-				forwardPkg(ring, frame, getTheOtherPortId(ring, from_port));
-				sw_flush_fdb(dev);
-				break;
-			case RPKG_COMPLETE_FLUSH_FDB:
-				forwardPkg(ring, frame, getTheOtherPortId(ring, from_port));
-				sw_change_virt_port(dev, ring->master_port, RPORT_STATUS_UP);
-				sw_change_virt_port(dev, ring->slave_port, RPORT_STATUS_UP);
-				sw_flush_fdb(dev);
-				break;
-			default:
-				forwardPkg(ring, frame, getTheOtherPortId(ring, from_port));
-		}
+	int ringId = getRpkgRingId(frame);
+	struct rrpp_ring* ring = getRing(domain, ringId);
+	if(ring != NULL && ring -> node_type == RNODE_MASTER && ring -> status == RRING_FAIL)
+	{
+					sendCommonFlushPkg(ring, getMaskOfRing(ring));
+					sw_flush_fdb(ring->pdomain->pdev);
+	} else if (ring != NULL) {
+		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
+	}
 	return 0;
 }
-int edgeNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+static int commonFlushHandler(struct rrpp_domain* domain, const struct sw_frame* frame, int from_port)
 {
-	int frametype = getRpkgType(frame);
-	struct sw_dev* dev = ring->pdomain->pdev;
-
+	int ringId = getRpkgRingId(frame);
+	struct rrpp_ring* ring = getRing(domain, ringId); 
+	if(ring != NULL)
+	{
+		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
+				sw_flush_fdb(ring->pdomain->pdev);
+	}
 	return 0;
-
-}
-int supNodeSM(struct rrpp_ring* ring, const struct sw_frame *frame,int from_port)
+} 
+static int completeFlushHandler(struct rrpp_domain* domain, const struct sw_frame* frame, int from_port)
 {
-	int frametype = getRpkgType(frame);
+	int ringId = getRpkgRingId(frame);
+	struct rrpp_ring* ring = getRing(domain, ringId);
 	struct sw_dev* dev = ring->pdomain->pdev;
-
+	if(ring != NULL)                // in the ring 
+	{
+		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
+		changeRrppPort(&ring->master_port, RPORT_STATUS_UP);
+		changeRrppPort(&ring->slave_port, RPORT_STATUS_UP);
+		sw_flush_fdb(ring->pdomain->pdev);
+	} else { 			
+		;
+	}
 	return 0;
-
 }
 int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int from_port)
 {
-       	int ringId = getRpkgRingId(frame);
 	int domainId = getRpkgDomainId(frame);
-	int frametype = getRpkgType(frame);
-	int seqNumber = getRpkgHelloSeq(frame);
-	struct rrpp_ring* ring = getRing(getDomain(dev, domainId), ringId);
-	char info[50];
-	sprintf(info, "recieve a frame type %d, seq %d", frametype, seqNumber);
-	logInfo(dev, info); 
-	switch(ring->node_type)
+	int frameType = getRpkgType(frame);
+	struct rrpp_domain* domain;
+	if((domain = getDomain(dev, domainId)) == NULL) return -1;
+	struct rrpp_ring* ring;
+	
+	
+	int seqNumber = getRpkgSeq(frame);
+	int ringId = getRpkgRingId(frame);
+	if(getHistorySeq(domain, frameType, ringId) >= seqNumber)
 	{
-		case RNODE_MAIN:
-			mainNodeSM(ring, frame, from_port);		
-			break;
-		case RNODE_TRANSFER:
-			transNodeSM(ring, frame, from_port);
-			break;
-		case RNODE_EDGE_MAIN:
-			edgeNodeSM(ring, frame, from_port);
-			break;
-		case RNODE_EDGE_SUPPORT:
-			supNodeSM(ring, frame, from_port);
-			break;
-		default:
-			logError("node_type error");
-			;
+		return 0;
+	} else {
+		setHistorySeq(domain, frameType, ringId, seqNumber);
+	}
 
+	char info[50];
+	sprintf(info, "recieve a frame type %d, seq %d", frameType, seqNumber);
+	logInfo(dev, info); 
+
+	switch(frameType)
+	{
+		case RPKG_HELLO:
+			helloHandler(domain, frame, from_port);
+			break;
+		case RPKG_LINK_UP:
+			linkUpHandler(domain, frame, from_port);
+			break;
+		case RPKG_LINK_DOWN:
+			linkDownHandler(domain, frame, from_port);
+			break;
+		case RPKG_COMMON_FLUSH_FDB:
+			commonFlushHandler(domain, frame, from_port);
+			break;
+		case RPKG_COMPLETE_FLUSH_FDB:
+			completeFlushHandler(domain, frame, from_port);
+			break;
+
+		default:
+			logError("Unknown RRPP PKG TYPE");
 	}
 	return 0;
 }
 
-int getTheOtherPortId(struct rrpp_ring* ring, int port)
-{
-	if(port == ring->slave_port)
-		return ring->master_port;
-	if(port == ring->master_port)
-		return ring->slave_port;
-	char error[100];
-	sprintf(error, "wrong port number, ring %d portid  should be %d or %d  but it is %d", ring->ring_id,  ring->slave_port, ring->master_port, port);
-	logError(error);
-	return -1;
-}
-
-int getPreforwardingPortId(struct sw_dev* dev, int ringId)
-{
-	int i = 0;
-	for(; i < dev->port_number; i++)
-	{
-		if(dev->ports[i].ring_id == ringId && dev->ports[i].status == RPORT_STATUS_PREFORWARDING)
-			return i; 
-	} 
-	return -1; 
-}
-
 int sw_rrpp_link_change(struct sw_dev* dev, int port, int link_up)
 {
-	struct rrpp_ring* ring = getRing(&dev->rrpp_domains[0], dev->ports[port].ring_id);
-	if(ring->node_type == RNODE_MAIN)
+	struct rrpp_ring* ring = dev->ports[port].pport->pring;
+	if(ring->node_type == RNODE_MASTER)
 	{
 		sw_change_virt_port(dev, port, link_up);
 		return 0;
@@ -305,14 +390,14 @@ int sw_rrpp_link_change(struct sw_dev* dev, int port, int link_up)
 	}
 	if(link_up == RPORT_STATUS_UP)
 	{
-		sendUpPkg(ring, getTheOtherPortId(ring, port));
-		sw_change_virt_port(dev, port, RPORT_STATUS_PREFORWARDING);
+		sendUpPkg(ring, getMaskDelPort(getMaskOfRing(ring), port));
+		changeRrppPort(dev->ports[port].pport, RPORT_STATUS_PREFORWARDING);
 		ring->wait_port = port;
 		pthread_create(&ring->flush_wait_id, NULL, (void*)flushTimeout, (void *)ring);
 	}else if(link_up == RPORT_STATUS_DOWN)
 	{
-		sendDownPkg(ring, getTheOtherPortId(ring, port));
-		sw_change_virt_port(dev, port, RPORT_STATUS_BLOCK);
+		sendDownPkg(ring, getMaskDelPort(getMaskOfRing(ring), port));
+		changeRrppPort(dev->ports[port].pport, RPORT_STATUS_BLOCK);
 	}
 	logError("link change trigger error");
 	return -1;
@@ -324,8 +409,7 @@ void polling(struct rrpp_ring* ring)
 {
 	while(1)
 	{
-		ring->hello_seq += 1;
-		sendHelloPkg(ring, ring->master_port);
+		sendHelloPkg(ring, getMaskAddPort(0, ring->master_port.virt_port->id));
 		pthread_create(&ring->hello_fail_id, NULL, (void*)helloTimeout, (void *)ring );
 		sleep(ring->hello_interval/1000);
 	}
@@ -334,7 +418,9 @@ void polling(struct rrpp_ring* ring)
 
 int startHello(struct rrpp_ring* ring) 
 {
-	logInfo(ring->pdomain->pdev, "start Hello proc");
+	char info[100];
+	sprintf(info, "Ring %d start Hello process", ring->ring_id);
+	logInfo(ring->pdomain->pdev, info); 
 	pthread_create(&ring->polling_id, NULL, (void *)polling, (void *)ring);
 
 	return 0; 
@@ -343,6 +429,5 @@ int stopHello(struct rrpp_ring* ring)
 {
 	logInfo(ring->pdomain->pdev, "stop Hello proc");
 	pthread_cancel(ring->polling_id);
-	//signal(SIGALRM, SIG_IGN);
 	return 0;
 }
