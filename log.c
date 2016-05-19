@@ -17,7 +17,6 @@ int initLogger()
 		char logpath[100] = "./log/dev";
 
 		logger.logFiles[i] = open(strcat(logpath, no), O_WRONLY|O_CREAT|O_NONBLOCK|O_TRUNC,S_IRWXU|S_IRWXG|S_IRWXO);
-		printf("%d %s", i, logpath);
 		
 	}
 	logger.errorFile = open("./log/error", O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK|O_TRUNC, S_IRWXU|S_IRWXG|S_IRWXO);

@@ -140,7 +140,10 @@ int main(int argc, char* args[])
 		buf = line;
 		if(strcmp("show", cmd) == 0)
 		{
-			
+			for(i = 0; i < LINK_NUMBER; i++) 
+			{
+				printLink(&gl_links[i]);
+			}
 		}
 		if(strcmp("down", cmd) == 0)
 		{

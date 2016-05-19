@@ -41,4 +41,6 @@ int initLink(struct rrpp_link* link, struct sw_port* p0, struct sw_port* p1);
 void passLink(int* dir);
 //struct sw_dev* getDev(int nodeId);
 void changeLinkStatus(struct rrpp_link* link, int status);
+void printLink(struct rrpp_link* link); 
+
 #endif

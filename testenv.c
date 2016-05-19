@@ -99,6 +99,20 @@ int initLink(struct rrpp_link* link, struct sw_port* p0, struct sw_port* p1)
 	p1->plink = link;
 	return 0;
 }
+void printLink(struct rrpp_link* link) 
+{
+	struct rrpp_port* p0 = link->port[0]->pport;
+	struct rrpp_port* p1 = link->port[1]->pport;
+	int ringId = p0->pring->ring_id;
+	int domainId = p0->pring->pdomain->domain_id;
+	char ps1 = (p0->status == PORT_UP)? '-' : 'x';
+	char ps2 = (p1->status == PORT_UP)? '-' : 'x';
+	char* ls = (link->status == RLINK_UP)? "---------" : "XXXXXXXXX";
+
+	printf("domain %d ring %d : dev%d %d %c %s %c %d dev%d\n", domainId, ringId, p0->pring->pdomain->node_id, link->port[0]->id, ps1, ls, ps2, link->port[1]->id, p1->pring->pdomain->node_id);
+}
+
+
 void passLink(int *dir)
 {
 	int direction = *dir;
@@ -126,7 +140,7 @@ void passLink(int *dir)
 	struct sw_port* toport = link->port[1 - direction];
 	char info[100];
 	sprintf(info, "sending a frame from node %d port %d to node %d port %d",
-		      fromport->pport->pring->pdomain->node_id, fromport->id, toport->pport->pring->pdomain->node_id, toport->id);
+		    fromport->pport->pring->pdomain->node_id, fromport->id, toport->pport->pring->pdomain->node_id, toport->id);
 	logLink(link, info);
 	sw_rrpp_frame_handler(toport->pport->pring->pdomain->pdev, &(link->frame[direction]), link->port[1-direction]->id);
 	

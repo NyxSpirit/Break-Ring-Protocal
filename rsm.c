@@ -19,7 +19,7 @@ static int getMaskAddPort(int mask, int portId)
 }
 static int getMaskDelPort(int mask, int portId)
 {
-	if(portId >= 0 && (mask & (1 << portId)))
+	if(portId >= 0)
 		return mask - (1 << portId);
 	else
 		return mask;
@@ -40,8 +40,8 @@ static int getMaskLELevel(const struct rrpp_domain* domain, int level)
 		struct rrpp_ring* ring = &domain->rings[i];
 		if(ring->ring_level <= level)
 		{
-	mask += (ring->slave_port.virt_port != NULL) ? 1<<(ring->slave_port.virt_port->id) : 0;
-	mask += (ring->master_port.virt_port != NULL) ? 1<<(ring->master_port.virt_port->id) : 0;
+			mask += (ring->slave_port.virt_port != NULL) ? 1<<(ring->slave_port.virt_port->id) : 0;
+			mask += (ring->master_port.virt_port != NULL) ? 1<<(ring->master_port.virt_port->id) : 0;
 		}
 	}
 	return mask;
@@ -86,8 +86,10 @@ void helloTimeout (struct rrpp_ring* ring)
 	if(getHistorySeq(ring->pdomain, RPKG_HELLO, ring->ring_id) < helloSeq && ring->status == RRING_COMPLETE)
 	{
 		//printf(" arrived seq %d helloseq %d hello interval %d\n", ring->arrived_hello_seq, helloSeq, ring->hello_interval);
-		sendCommonFlushPkg(ring, getMaskAddPort(0, ring->slave_port.virt_port->id));
-		changeRrppPort(&ring->slave_port, RPORT_STATUS_UP);	
+		if(ring->master_port.virt_port == NULL)
+			logError("master node miss master port");
+		sendCommonFlushPkg(ring, getMaskAddPort(0, ring->master_port.virt_port->id));
+		changeRrppPort(&ring->master_port, RPORT_STATUS_UP);	
 		ring->status = RRING_FAIL;
 	}	
 
@@ -123,17 +125,18 @@ int sw_rrpp_init_ring(struct rrpp_ring* ring, struct rrpp_domain* pdomain, int r
 
 	if(masterPort != -1)
 	{
-	port = &ring->pdomain->pdev->ports[masterPort];
-	rrpp_init_port(&ring->master_port, ring, port, RPORT_TYPE_MASTER);
+		port = &ring->pdomain->pdev->ports[masterPort];
+		rrpp_init_port(&ring->master_port, ring, port, RPORT_TYPE_MASTER);
 	}else 
 		ring->master_port.virt_port = NULL;
-;
+
 	if(slavePort != -1)
 	{
-	port = &ring->pdomain->pdev->ports[slavePort];
-	rrpp_init_port(&ring->slave_port, ring, port, RPORT_TYPE_SLAVE);	
+		port = &ring->pdomain->pdev->ports[slavePort];
+		rrpp_init_port(&ring->slave_port, ring, port, RPORT_TYPE_SLAVE);	
 	} else
 		ring->slave_port.virt_port = NULL;
+
 	memset(ring->seq, 0, sizeof(ring->seq));
 	ring->hello_interval = helloInterval; 
 	ring->hello_fail_time = helloFailTime;
@@ -262,8 +265,8 @@ static int helloHandler(struct rrpp_domain* domain, const struct sw_frame* frame
 	{
 		struct sw_dev* dev = ring->pdomain->pdev;
 		sendCompleteFlushPkg(ring, getMaskOfRing(ring));
-		changeRrppPort(&ring->slave_port, RPORT_STATUS_BLOCK);
-		changeRrppPort(&ring->master_port, RPORT_STATUS_UP);
+		changeRrppPort(&ring->master_port, RPORT_STATUS_BLOCK);
+		changeRrppPort(&ring->slave_port, RPORT_STATUS_UP);
 		sw_flush_fdb(dev);
 		ring->status = RRING_COMPLETE;
 		
@@ -281,10 +284,10 @@ static int linkDownHandler(struct rrpp_domain* domain, const struct sw_frame* fr
 	struct sw_dev* dev = ring->pdomain->pdev;
 	if(ring != NULL && ring -> node_type == RNODE_MASTER && ring -> status == RRING_COMPLETE)
 	{
-					sendCommonFlushPkg(ring, getMaskOfRing(ring));
-					changeRrppPort(&ring->slave_port, RPORT_STATUS_UP);	
-					sw_flush_fdb(dev);
-					ring->status = RRING_FAIL;
+		sendCommonFlushPkg(ring, getMaskOfRing(ring));
+		changeRrppPort(&ring->master_port, RPORT_STATUS_UP);	
+		sw_flush_fdb(dev);
+		ring->status = RRING_FAIL;
 	} else if (ring != NULL) {
 		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
 	}
@@ -296,8 +299,8 @@ static int linkUpHandler(struct rrpp_domain* domain, const struct sw_frame* fram
 	struct rrpp_ring* ring = getRing(domain, ringId);
 	if(ring != NULL && ring -> node_type == RNODE_MASTER && ring -> status == RRING_FAIL)
 	{
-					sendCommonFlushPkg(ring, getMaskOfRing(ring));
-					sw_flush_fdb(ring->pdomain->pdev);
+		sendCommonFlushPkg(ring, getMaskOfRing(ring));
+		sw_flush_fdb(ring->pdomain->pdev);
 	} else if (ring != NULL) {
 		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
 	}
@@ -310,7 +313,7 @@ static int commonFlushHandler(struct rrpp_domain* domain, const struct sw_frame*
 	if(ring != NULL)
 	{
 		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
-				sw_flush_fdb(ring->pdomain->pdev);
+		sw_flush_fdb(ring->pdomain->pdev);
 	}
 	return 0;
 } 
@@ -349,7 +352,7 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 	}
 
 	char info[50];
-	sprintf(info, "recieve a frame type %d, seq %d", frameType, seqNumber);
+	sprintf(info, "recieve a frame type %d, seq %d, port %d", frameType, seqNumber, from_port);
 	logInfo(dev, info); 
 
 	switch(frameType)
