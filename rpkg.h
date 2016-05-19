@@ -5,9 +5,7 @@
 
 enum rrpp_node_type {
 	RNODE_MASTER,
-	RNODE_TRANSFER,
-	RNODE_EDGE_MAIN,
-	RNODE_EDGE_SUPPORT
+	RNODE_TRANSFER
 };
 
 enum rrpp_pkg_type {
