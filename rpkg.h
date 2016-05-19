@@ -3,22 +3,17 @@
 #include "common.h"
 #include "testenv.h"
 
-enum rrpp_node_type {
-	RNODE_MASTER,
-	RNODE_TRANSFER
-};
-
+//couple with common.h  :  RRPP_FRAME_TYPE_NUMBER
+//
 enum rrpp_pkg_type {
 	RPKG_HELLO,
 	RPKG_LINK_UP,
 	RPKG_LINK_DOWN,
 	RPKG_COMMON_FLUSH_FDB,
 	RPKG_COMPLETE_FLUSH_FDB,
-	RPKG_EDGE_HELLO,
-	RPKG_MAJOR_FAULT
 };
 
-
+// rrpp frame structure 
 struct rrpp_frame
 {
 	u8 des_mac_addr[6];
@@ -62,15 +57,11 @@ int sendUpPkg(struct rrpp_ring *ring, int mask);
 int sendDownPkg(struct rrpp_ring *ring, int mask); 
 int sendCommonFlushPkg(struct rrpp_ring *ring, int mask); 
 int sendCompleteFlushPkg(struct rrpp_ring *ring, int mask); 
-struct sw_frame* getFrameModule(struct rrpp_ring *ring);
 
 int getRpkgRingId(const struct sw_frame* frame);
 int getRpkgType(const struct sw_frame* frame);
 int getRpkgSeq(const struct sw_frame* frame);
 int getRpkgDomainId(const struct sw_frame* frame);
 int getRpkgRingLevel(const struct sw_frame* frame);
-
-void printFrame(const struct sw_frame* frame);
-int createHelloFrame(struct rrpp_ring *ring, struct sw_frame* frame, int hello_seq);
 
 #endif

@@ -4,6 +4,16 @@
 #include "rpkg.h"
 #include "common.h"
 
+enum rrpp_node_type {
+	RNODE_MASTER,
+	RNODE_TRANSFER
+};
+
+enum rrpp_port_type {
+	RPORT_TYPE_SLAVE,
+	RPORT_TYPE_MASTER  
+};
+
 enum rrpp_port_status {
 	RPORT_STATUS_DOWN,
 	RPORT_STATUS_UP,
@@ -28,6 +38,8 @@ int sw_rrpp_init_frame(struct sw_dev* dev);
 int sw_rrpp_start(struct sw_dev* dev); 
 int sw_rrpp_stop(struct sw_dev* dev);
 int sw_rrpp_destroy(struct sw_dev* dev);
+
+
 int sw_rrpp_frame_handler(struct sw_dev* dev, 
 		const struct sw_frame *frame,
 		int from_port);

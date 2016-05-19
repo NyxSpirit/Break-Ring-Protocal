@@ -29,6 +29,8 @@ void setMacAddr(u8* des, u8* src)
 	} 
 }
 
+//==================================== transfer a rrpp control frame =========================
+//
 int forwardPkg(struct rrpp_domain* domain, const struct sw_frame* frame, int mask)
 {
 	//struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
@@ -39,28 +41,21 @@ int forwardPkg(struct rrpp_domain* domain, const struct sw_frame* frame, int mas
 	return sw_send_frame_virt(domain->pdev, frame, mask);
 }
 
+//=====================================  send out a rrpp control frame =========================
+//   @ param :    ring       pointer to the ring frame belongs to      
+//   		  mask       virt port mask   reference to common.h
+//   increase frame type seq of the ring 
+//   frame buffer which is inited before  stored in rrpp_ring 
+//
 int sendHelloPkg(struct rrpp_ring* ring, int mask) 
 {
-	//struct rrpp_frame* pkg = (struct rrpp_frame*) frame->frame_data;
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
-	//setMacAddr(data->des_mac_addr, data->sys_mac_addr);
 	ring->seq[RPKG_HELLO]++;  
 	data->rrpp_type = RPKG_HELLO;
 	data->seq = ring->seq[RPKG_HELLO];
 	return sw_send_frame_virt(ring->pdomain->pdev, &(ring->rrpp_frame), mask);
 }
 
-int createHelloFrame(struct rrpp_ring* ring, struct sw_frame* frame, int seq)
-{
-	memcpy(frame, &(ring->rrpp_frame), sizeof(struct sw_frame));
-	
-	struct rrpp_frame* data = (struct rrpp_frame*) frame->frame_data;
-	
-	//setMacAddr(data->des_mac_addr, data->sys_mac_addr);
-	data->rrpp_type = RPKG_HELLO;
-	data->seq = seq;
-	return 0;
-}
 int sendUpPkg(struct rrpp_ring* ring,int mask) 
 {
 	struct rrpp_frame* data = (struct rrpp_frame*) (ring->rrpp_frame).frame_data;
@@ -102,7 +97,7 @@ int sendCompleteFlushPkg(struct rrpp_ring* ring, int mask)
 }
 
 
-
+//==================================== init common fields of rrpp frame ============ 
 int initRrppFrame(struct rrpp_ring* ring)
 {
 	struct sw_dev* dev = ring->pdomain->pdev;
@@ -126,16 +121,16 @@ int initRrppFrame(struct rrpp_ring* ring)
 	data->constants1[3] = 0x0b;
 	data->rrpp_length = 0x0040; 	
         data->rrpp_vers = 0x01;
-	data->rrpp_type = 0;               // to be set 
-	data->domain_id = ring->pdomain->domain_id;               // to be set
-	data->ring_id = ring->ring_id;                 // to be set
+	data->rrpp_type = 0;               		// to be set 
+	data->domain_id = ring->pdomain->domain_id;     
+	data->ring_id = ring->ring_id;                 
 	data->zeroes1 = 0;
 	setMacAddr(data->sys_mac_addr, dev->local_mac_addr.val);
 	data->hello_timer = ring->hello_interval;
 	data->fail_timer = ring->hello_fail_time;
 	data->zeroes2 = 0;
-	data->level = ring->ring_level;		   // to be set
-	data->seq =  0;		   // to be set
+	data->level = ring->ring_level;		   
+	data->seq =  0;		   			// to be set
 	data->zeroes3 = 0;
         int i = 0;
 	for(; i < 36; i++)
@@ -146,6 +141,8 @@ int initRrppFrame(struct rrpp_ring* ring)
 	return 0;
 } 
 
+//=======================================extract rrpp field from common frame structure=========
+//
 int getRpkgType(const struct sw_frame* frame)
 {
 	struct rrpp_frame* pframe = (struct rrpp_frame*) frame->frame_data;

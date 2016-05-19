@@ -14,8 +14,6 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 #define SW_MAX_ETH_LEN (1522)
-#define RPORT_TYPE_MASTER 1
-#define RPORT_TYPE_SLAVE 0
 
 #define PORT_UP        1
 #define PORT_DOWN      0
@@ -39,15 +37,18 @@ struct sw_port 			// virt
 };
 struct rrpp_port
 {
-	struct sw_port* virt_port;
+	struct rrpp_ring* pring;    //pointer to parent
+
+	struct sw_port* virt_port;  //null : not exist  
 	u8 type;           // 1: Master 0:slave
-	struct rrpp_ring* pring; 
 	u8 status;
 };
-// describe dev info on certain rrpp ring 
+
+// 
 struct rrpp_ring
 {
-	struct rrpp_domain* pdomain;
+	struct rrpp_domain* pdomain; //pointer to parent 
+
 	u8 ring_id;
 	u8 ring_level;
 	u8 node_type;
@@ -77,6 +78,7 @@ struct rrpp_domain
 	u8 domain_id;
 	u8 vlan_id;
 	u8 node_id;
+
 	u8 ring_num;
 	struct rrpp_ring* rings;
 	u32 history_seqs[RRPP_FRAME_TYPE_NUMBER * MAX_POSSIBLE_RING_NUMBER];
