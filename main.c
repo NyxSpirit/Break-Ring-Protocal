@@ -22,8 +22,8 @@ int main(int argc, char* args[])
 	int domainId = 1;
 	int ringId = 1;
 	int ringLevel = 0;
-	int helloInterval = 1000;
-	int helloFailTime = 3000;
+	int helloInterval = 1000000;
+	int helloFailTime = 3000000;
 		// create an 8-node ladder topo;
 	int nodeNum = DEV_NUMBER;
 	int PORT_NUMBER = 2;

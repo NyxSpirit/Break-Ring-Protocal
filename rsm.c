@@ -83,7 +83,7 @@ static int changeRrppPort(struct rrpp_port* port, int status)
 // timeout handlers 
 static void flushTimeout (struct rrpp_ring* ring)
 {
-        sleep(ring->hello_fail_time/1000);
+        usleep(ring->hello_fail_time);
 	struct sw_dev* dev = ring->pdomain->pdev; 
 	if(ring->wait_port < 0) 
 		return;
@@ -95,14 +95,14 @@ static void helloTimeout (struct rrpp_ring* ring)
 {
 		
 	int helloSeq = ring->seq[RPKG_HELLO];                  // record hello seq first
-	sleep(ring->hello_fail_time/1000);
+	usleep(ring->hello_fail_time);
 	if(getHistorySeq(ring->pdomain, RPKG_HELLO, ring->ring_id) < helloSeq && ring->status == RRING_COMPLETE) // no newer hello pkg recieved
 	{
-		//printf(" arrived seq %d helloseq %d hello interval %d\n", ring->arrived_hello_seq, helloSeq, ring->hello_interval);
+		printf(" arrived seq %d helloseq %d hello interval %d\n", getHistorySeq(ring->pdomain, RPKG_HELLO, ring->ring_id), helloSeq, ring->hello_fail_time);
 		if(ring->master_port.virt_port == NULL)
 			logError("master node miss master port");
-		sendCommonFlushPkg(ring, getMaskAddPort(0, ring->master_port.virt_port->id));         // ring fail, use redundant link
 		changeRrppPort(&ring->master_port, RPORT_STATUS_UP);	
+		sendCommonFlushPkg(ring, getMaskAddPort(0, ring->master_port.virt_port->id));         // ring fail, use redundant link
 		ring->status = RRING_FAIL;
 	}	
 
@@ -175,7 +175,8 @@ static int linkUpHandler(struct rrpp_domain* domain, const struct sw_frame* fram
 	struct rrpp_ring* ring = getRing(domain, ringId);
 	if(ring != NULL && ring -> node_type == RNODE_MASTER && ring -> status == RRING_FAIL)
 	{
-		sendCommonFlushPkg(ring, getMaskLELevel(domain, ring->ring_level));
+		//sendCommonFlushPkg(ring, getMaskLELevel(domain, ring->ring_level));
+		sendHelloPkg(ring, getMaskAddPort(0, ring->master_port.virt_port->id));
 		sw_flush_fdb(ring->pdomain->pdev);
 	} else if (ring != NULL) {
 		forwardPkg(domain, frame, getMaskDelPort(getMaskOfRing(ring), from_port));
@@ -443,7 +444,8 @@ int sw_rrpp_link_change(struct sw_dev* dev, int port, int link_up)
 	{
 		if(ring->node_type == RNODE_MASTER)            // handle directly
 		{
-			sendCommonFlushPkg(ring, getMaskOfRing(ring));
+			//sendCommonFlushPkg(ring, getMaskOfRing(ring));
+			sendHelloPkg(ring, getMaskAddPort(0, ring->master_port.virt_port->id));
 		 	sw_flush_fdb(dev);	
 		}else {
 			// inform master node 
@@ -477,7 +479,4 @@ int sw_rrpp_link_change(struct sw_dev* dev, int port, int link_up)
 	logError("link change trigger error");
 	return -1;
 }
-
-
- 
 
