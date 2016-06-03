@@ -6,7 +6,8 @@
 
 enum rrpp_node_type {
 	RNODE_MASTER,
-	RNODE_TRANSFER
+	RNODE_TRANSFER,
+	RNODE_SLAVE
 };
 
 enum rrpp_port_type {
