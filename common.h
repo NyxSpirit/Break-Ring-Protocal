@@ -18,7 +18,7 @@ typedef uint64_t u64;
 #define PORT_UP        1
 #define PORT_DOWN      0
 
-#define RRPP_FRAME_TYPE_NUMBER 10 
+#define RRPP_FRAME_TYPE_NUMBER 20 
 #define MAX_POSSIBLE_RING_NUMBER 100
 
 struct sw_frame {

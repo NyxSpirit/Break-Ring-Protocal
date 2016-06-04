@@ -424,8 +424,8 @@ int sw_rrpp_frame_handler(struct sw_dev* dev, const struct sw_frame *frame, int 
 			break;
 		case RPKG_COMPLETE_FLUSH_FDB:
 			completeFlushHandler(domain, frame, from_port);
-			break;
-
+			break;	
+	        case 
 		default:
 			logError("Unknown RRPP PKG TYPE");
 	}

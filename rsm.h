@@ -24,7 +24,9 @@ enum rrpp_port_status {
 
 enum rrpp_ring_status {
 	RRING_COMPLETE,
-	RRING_FAIL,
+	RRING_VIRTUAL_FAIL,
+	RRING_REAL_FAIL,
+	RRING_DOWN,
 	RRING_INIT
 };
 
